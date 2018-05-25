@@ -94,7 +94,8 @@ class CopyOp : public OpKernel {
                                   !context->input_alloc_attr(0).on_host();
 
       if (off_host_input) {
-        SYCLmemcpy(context->eigen_sycl_device(), src_tensor, copied_tensor);
+        SYCLUtil::copyDeviceTensorToDevice(device, src_tensor, *copied_tensor);
+        device->Sync();
       } else {
         *copied_tensor = tensor::DeepCopy(src_tensor);
       }

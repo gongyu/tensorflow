@@ -165,7 +165,7 @@ struct ReverseSequence<SYCLDevice, T, Tlen, Dims> {
       ReverseSequenceKernelSYCL<T, Tlen, Dims> kernel(batch_dim, seq_dim,
           coord_dims, seq_lengths_acc, input_acc, output_acc, input.size());
 
-      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, input.size());
+      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, input.size());
       cgh.parallel_for(nd_rng, kernel);
     });
   }

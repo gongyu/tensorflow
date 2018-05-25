@@ -19,6 +19,9 @@ limitations under the License.
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/tensor_types.h"
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif
 
 namespace tensorflow {
 namespace functor {
@@ -36,6 +39,16 @@ struct QuantizeAndDequantizeOneScaleFunctor {
 // The implementation below runs on both CPU and GPU.
 template <typename Device, typename T>
 struct QuantizeAndDequantizeOneScaleImpl {
+
+  // Default version of CopyMinMax runs on CPU, on GPU the copy needs to be blocking
+  static inline void CopyMinMax(const Device& d,
+      typename TTypes<T>::Scalar input_min,
+      typename TTypes<T>::Scalar input_max,
+      T& min_range, T& max_range) {
+    d.memcpyDeviceToHost(&min_range, input_min.data(), sizeof(T));
+    d.memcpyDeviceToHost(&max_range, input_max.data(), sizeof(T));
+  }
+
   static void Compute(const Device& d, typename TTypes<T>::ConstVec input,
                       bool signed_input, int num_bits, bool range_given,
                       Tensor* input_min_tensor, Tensor* input_max_tensor,
@@ -48,8 +61,7 @@ struct QuantizeAndDequantizeOneScaleImpl {
       input_min.device(d) = input.minimum();
       input_max.device(d) = input.maximum();
     }
-    d.memcpyDeviceToHost(&min_range, input_min.data(), sizeof(T));
-    d.memcpyDeviceToHost(&max_range, input_max.data(), sizeof(T));
+    CopyMinMax(d, input_min, input_max, min_range, max_range);
 
     // Calculate the range for the simulated integer quantization:
     // e.g. [-128,127] for signed = true, num_bits = 8,
@@ -99,6 +111,21 @@ struct QuantizeAndDequantizeOneScaleImpl {
     }
   }
 };
+
+#ifdef TENSORFLOW_USE_SYCL
+template <typename T>
+inline void QuantizeAndDequantizeOneScaleImpl<Eigen::SyclDevice, T>::CopyMinMax(
+    const Eigen::SyclDevice& d, typename TTypes<T>::Scalar input_min,
+    typename TTypes<T>::Scalar input_max, T& min_range, T& max_range) {
+  Notification done_copy_min, done_copy_max;
+  d.memcpyDeviceToHost(&min_range, input_min.data(), sizeof(T),
+      [&done_copy_min]() { done_copy_min.Notify(); });
+  d.memcpyDeviceToHost(&max_range, input_max.data(), sizeof(T),
+      [&done_copy_max]() { done_copy_max.Notify(); });
+  done_copy_min.WaitForNotification();
+  done_copy_max.WaitForNotification();
+}
+#endif
 
 }  // end of namespace functor
 }  // end of namespace tensorflow

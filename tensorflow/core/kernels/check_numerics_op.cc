@@ -297,14 +297,17 @@ class CheckNumericsOp<SYCLDevice, T> : public OpKernel {
       auto output_access = output_buffer.template get_access<
                              cl::sycl::access::mode::discard_write>(cgh);
 
-      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, in.size());
+      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, in.size());
       auto kernel = CheckNumericsKernel<T>{input_access, output_access, in.size()};
 
       // Kernel writes if any value was inf or nan to out
       cgh.parallel_for(nd_rng, kernel);
     });
     std::array<bool, 2> host_out;
-    d.memcpyDeviceToHost(host_out.data(), out.data(), 2 * sizeof(bool));
+    Notification done_copy;
+    d.memcpyDeviceToHost(host_out.data(), out.data(), 2 * sizeof(bool),
+        [&done_copy]() { done_copy.Notify(); });
+    done_copy.WaitForNotification();
     std::string status;
     if (host_out[0] && host_out[1])
       status = "Inf and Nan";

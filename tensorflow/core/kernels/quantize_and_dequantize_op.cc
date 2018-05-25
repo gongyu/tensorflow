@@ -70,13 +70,8 @@ class QuantizeAndDequantizeV2Op : public OpKernel {
       auto input_max = input_max_tensor.scalar<T>();
       T min_val;
       T max_val;
-#ifdef TENSORFLOW_USE_SYCL
-      device.memcpyDeviceToHost(&min_val, input_min.data(), sizeof(T));
-      device.memcpyDeviceToHost(&max_val, input_max.data(), sizeof(T));
-#else
       min_val = input_min();
       max_val = input_max();
-#endif // TENSORFLOW_USE_SYCL
       OP_REQUIRES(ctx, min_val <= max_val,
                   errors::InvalidArgument("Invalid range: input_min ", min_val,
                                           " > input_max ", max_val));
@@ -139,13 +134,8 @@ class QuantizeAndDequantizeV3Op : public OpKernel {
       auto input_max = input_max_tensor.scalar<T>();
       T min_val;
       T max_val;
-#ifdef TENSORFLOW_USE_SYCL
-      device.memcpyDeviceToHost(&min_val, input_min.data(), sizeof(T));
-      device.memcpyDeviceToHost(&max_val, input_max.data(), sizeof(T));
-#else
       min_val = input_min();
       max_val = input_max();
-#endif // TENSORFLOW_USE_SYCL
       OP_REQUIRES(ctx, min_val <= max_val,
                   errors::InvalidArgument("Invalid range: input_min ", min_val,
                                           " > input_max ", max_val));
@@ -200,13 +190,8 @@ class QuantizeAndDequantizeOp : public OpKernel {
     auto device = ctx->eigen_device<Device>();
     auto input_min = input_min_tensor.scalar<T>();
     auto input_max = input_max_tensor.scalar<T>();
-#ifdef TENSORFLOW_USE_SYCL
-    input_min.device(device) = input_min.constant(static_cast<T>(input_min_));
-    input_max.device(device) = input_max.constant(static_cast<T>(input_max_));
-#else
     input_min() = static_cast<T>(input_min_);
     input_max() = static_cast<T>(input_max_);
-#endif // TENSORFLOW_USE_SYCL
 
     functor::QuantizeAndDequantizeOneScaleFunctor<Device, T> functor;
     functor(device, input.flat<T>(), signed_input_,
@@ -296,10 +281,14 @@ TF_CALL_double(REGISTER_GPU_KERNEL);
 #define REGISTER_SYCL_KERNEL(T)                                                 \
   REGISTER_KERNEL_BUILDER(Name("QuantizeAndDequantizeV2")                       \
                               .Device(DEVICE_SYCL)                              \
+                              .HostMemory("input_max")                          \
+                              .HostMemory("input_min")                          \
                               .TypeConstraint<T>("T"),                          \
                           QuantizeAndDequantizeV2Op<SYCLDevice, T>);            \
   REGISTER_KERNEL_BUILDER(Name("QuantizeAndDequantizeV3")                       \
                               .Device(DEVICE_SYCL)                              \
+                              .HostMemory("input_max")                          \
+                              .HostMemory("input_min")                          \
                               .HostMemory("num_bits")                           \
                               .TypeConstraint<T>("T"),                          \
                           QuantizeAndDequantizeV3Op<SYCLDevice, T>);            \

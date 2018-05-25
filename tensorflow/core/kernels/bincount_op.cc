@@ -127,7 +127,10 @@ struct BincountFunctor<SYCLDevice, T> {
     auto all_nonneg = all_nonneg_t.scalar<bool>();
     all_nonneg.device(d) = (arr >= 0).all();
     bool all_nonneg_host = false;
-    d.memcpyDeviceToHost(&all_nonneg_host, all_nonneg.data(), sizeof(bool));
+    Notification done_copy;
+    d.memcpyDeviceToHost(&all_nonneg_host, all_nonneg.data(), sizeof(bool),
+        [&done_copy]() { done_copy.Notify(); });
+    done_copy.WaitForNotification();
     if (!all_nonneg_host) {
       return errors::InvalidArgument("Input arr must be non-negative!");
     }

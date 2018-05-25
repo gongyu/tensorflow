@@ -73,8 +73,10 @@ struct BucketizeFunctor<SYCLDevice, T> {
       return s;
     }
     auto t_boundaries = device_boundaries.template matrix<float>();
+    Notification done_copy;
     d.memcpyHostToDevice(t_boundaries.data(), boundaries_vector.data(),
-                         sizeof(float) * num_bounds);
+                         sizeof(float) * num_bounds,
+                         [&done_copy]() { done_copy.Notify(); });
 
 #if !defined(EIGEN_HAS_INDEX_LIST)
     Eigen::Tensor<Eigen::DenseIndex, 2>::Dimensions
@@ -98,6 +100,7 @@ struct BucketizeFunctor<SYCLDevice, T> {
     output.device(d) =
       (input_2d >= bounds_2d).template cast<int32>().sum(reduce_dim);
 
+    done_copy.WaitForNotification();
     return Status::OK();
   }
 };

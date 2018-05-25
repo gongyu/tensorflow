@@ -21,6 +21,7 @@ limitations under the License.
 #define TENSORFLOW_COMMON_RUNTIME_SYCL_SYCL_DEVICE_CONTEXT_H_
 
 #include "tensorflow/core/common_runtime/device.h"
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
 #include "tensorflow/core/framework/device_base.h"
 
 namespace tensorflow {
@@ -31,13 +32,18 @@ class SYCLDeviceContext : public DeviceContext {
 
   ~SYCLDeviceContext() override {}
 
-  void CopyCPUTensorToDevice(const Tensor *cpu_tensor, Device *device,
-                             Tensor *device_tensor,
-                             StatusCallback done) const override;
+  inline void CopyCPUTensorToDevice(const Tensor *cpu_tensor, Device *device,
+                                    Tensor *device_tensor,
+                                    StatusCallback done) const override {
+    SYCLUtil::copyCPUTensorToDevice(device, *cpu_tensor, *device_tensor, done);
+  }
 
-  void CopyDeviceTensorToCPU(const Tensor *device_tensor, StringPiece edge_name,
-                             Device *device, Tensor *cpu_tensor,
-                             StatusCallback done) override;
+  inline void CopyDeviceTensorToCPU(const Tensor *device_tensor,
+                                    StringPiece,
+                                    Device *device, Tensor *cpu_tensor,
+                                    StatusCallback done) override {
+    SYCLUtil::copyDeviceTensorToCPU(device, *device_tensor, *cpu_tensor, done);
+  }
 };
 
 }  // namespace tensorflow

@@ -448,7 +448,7 @@ Status DoCopy(const CPUDevice& device, const Tensor& x, Tensor* y) {
 template <>
 Status DoCopy(const SYCLDevice& device, const Tensor& x, Tensor* y) {
   CHECK_EQ(x.dtype(), y->dtype());
-  SYCLmemcpy(device, x, y);
+  SYCLUtil::copyDeviceTensorToDevice(device, x, *y);
   return Status::OK();
 }
 #endif  // TENSORFLOW_USE_SYCL

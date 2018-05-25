@@ -340,7 +340,7 @@ struct LaunchLRN<SYCLDevice, T> {
 
     auto sycl_queue = device.sycl_queue();
     sycl_queue.submit([&](cl::sycl::handler& cgh) {
-      cl::sycl::nd_range<2> rng = get_sycl_nd_range(device, reshaped_rows, depth);
+      cl::sycl::nd_range<2> rng = SYCLUtil::get_nd_range(device, reshaped_rows, depth);
       auto in_acc = in_buffer.template get_access<
                       cl::sycl::access::mode::read>(cgh);
       auto out_acc = out_buffer.template get_access<

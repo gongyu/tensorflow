@@ -300,7 +300,7 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
       auto output_access =
           output_buffer.template get_access<cl::sycl::access::mode::read_write>(cgh);
 
-      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, slice_size);
+      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, slice_size);
 
       ScatterNdKernel<T, Index, OP, IXDIM> kernel(
           indices_access, updates_access, output_access, batch_size,

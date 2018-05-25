@@ -426,6 +426,7 @@ REGISTER_KERNEL_BUILDER(Name("PadV2")
                           PadOp<SYCLDevice, T, int64>)
 
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNEL);
+TF_CALL_int8(REGISTER_SYCL_KERNEL);
 REGISTER_KERNEL_BUILDER(Name("Pad")
                             .Device(DEVICE_SYCL)
                             .TypeConstraint<int32>("T")

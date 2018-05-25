@@ -2996,14 +2996,14 @@ cc_library(
     srcs = if_not_windows([
         "common_runtime/sycl/sycl_allocator.cc",
         "common_runtime/sycl/sycl_device.cc",
-        "common_runtime/sycl/sycl_device_context.cc",
         "common_runtime/sycl/sycl_device_factory.cc",
+        "common_runtime/sycl/sycl_util.cc",
     ]),
     hdrs = if_not_windows([
         "common_runtime/sycl/sycl_allocator.h",
         "common_runtime/sycl/sycl_device.h",
-        "common_runtime/sycl/sycl_util.h",
         "common_runtime/sycl/sycl_device_context.h",
+        "common_runtime/sycl/sycl_util.h",
     ]),
     copts = tf_copts(),
     linkstatic = 0,

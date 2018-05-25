@@ -22,102 +22,114 @@ limitations under the License.
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/common_runtime/device.h"
-// For DMA helper
 #include "tensorflow/core/common_runtime/dma_helper.h"
 #include "tensorflow/core/framework/tensor.h"
-
-//TODO(codeplay): remove later
-#include <cstdlib>
-#include <thread>
+#include "tensorflow/core/lib/core/notification.h"
 
 namespace tensorflow {
 
 inline void const* GetBase(const Tensor* src) { return DMAHelper::base(src); }
 inline void* GetBase(Tensor* dst) { return DMAHelper::base(dst); }
 
-inline void SYCLmemcpy(Eigen::SyclDevice const& device,
-                       Tensor const& src_tensor, Tensor* dst_tensor) {
-  const size_t size = src_tensor.TotalBytes();
-  void* dst_ptr = GetBase(dst_tensor);
-  void const* src_ptr = GetBase(&src_tensor);
+class SYCLUtil {
+ public:
+  static void copyCPUTensorToDevice(
+      const Eigen::SyclDevice& sycl_device, const Tensor& cpu_tensor,
+      Tensor& device_tensor, StatusCallback done = [](const Status&) {});
 
-#define COPY_WITH_TYPE(T) \
-  device.memcpy(dst_ptr, static_cast<T const*>(src_ptr), size);
-  switch (src_tensor.dtype()) {
-    case DT_COMPLEX128:
-      COPY_WITH_TYPE(cl::sycl::cl_ulong2);
-      break;
-    case DT_DOUBLE:
-    case DT_COMPLEX64:
-    case DT_INT64:
-      COPY_WITH_TYPE(cl::sycl::cl_ulong);
-      break;
-    case DT_FLOAT:
-    case DT_INT32:
-    case DT_QINT32:
-      COPY_WITH_TYPE(cl::sycl::cl_uint);
-      break;
-    case DT_INT16:
-    case DT_UINT16:
-    case DT_BFLOAT16:
-    case DT_QINT16:
-    case DT_QUINT16:
-    case DT_HALF:
-      COPY_WITH_TYPE(cl::sycl::cl_ushort);
-      break;
-    case DT_BOOL:
-      COPY_WITH_TYPE(bool);
-      break;
-    case DT_UINT8:
-    case DT_INT8:
-    case DT_QINT8:
-    case DT_QUINT8:
-      COPY_WITH_TYPE(cl::sycl::cl_uchar);
-      break;
-    default:
-      LOG(FATAL) << "Unknown data type " << src_tensor.dtype();
-      break;
+  static void copyDeviceTensorToCPU(
+      const Eigen::SyclDevice& sycl_device, const Tensor& device_tensor,
+      Tensor& cpu_tensor, StatusCallback done = [](const Status&) {});
+
+  static void copyDeviceTensorToDevice(const Eigen::SyclDevice& sycl_device,
+                                       const Tensor& src_tensor,
+                                       Tensor& dst_tensor);
+
+  static inline void blockingCopyCPUTensorToDevice(
+      const Eigen::SyclDevice& sycl_device, const Tensor& cpu_tensor,
+      Tensor& device_tensor) {
+    Notification done_copy;
+    SYCLUtil::copyCPUTensorToDevice(sycl_device, cpu_tensor, device_tensor,
+        [&done_copy](const Status& s) { done_copy.Notify(); });
+    done_copy.WaitForNotification();
   }
-#undef COPY_WITH_TYPE
-}
 
-template <class SDStatus>
-inline Status get_sd_err_msg(const SDStatus& s) {
-  return errors::Internal("Internal error from SYCL-DNN code " +
-      std::to_string(static_cast<int>(s.status)));
-}
+  static inline void blockingCopyDeviceTensorToCPU(
+      const Eigen::SyclDevice& sycl_device, const Tensor& device_tensor,
+      Tensor& cpu_tensor) {
+    Notification done_copy;
+    SYCLUtil::copyDeviceTensorToCPU(sycl_device, device_tensor, cpu_tensor,
+        [&done_copy](const Status& s) { done_copy.Notify(); });
+    done_copy.WaitForNotification();
+  }
 
-//TODO(codeplay): remove later
-inline bool is_snn_enabled() {
-  static const char* use_snn_cstr = std::getenv("TF_SYCL_USE_SNN");
-  static bool use_snn = use_snn_cstr == nullptr || std::string(use_snn_cstr) != "0";
-  return use_snn;
-}
+  static inline void copyCPUTensorToDevice(
+      Device* device, const Tensor& cpu_tensor, Tensor& device_tensor,
+      StatusCallback done = [](const Status&) {}) {
+    copyCPUTensorToDevice(*device->eigen_sycl_device(), cpu_tensor,
+                          device_tensor, done);
+  }
 
-inline const cl::sycl::id<3> get_max_work_item_tuple(const Eigen::SyclDevice& d) {
-  const auto& device = d.sycl_queue().get_device();
-  return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
-}
+  static inline void copyDeviceTensorToCPU(
+      Device* device, const Tensor& device_tensor, Tensor& cpu_tensor,
+      StatusCallback done = [](const Status&) {}) {
+    copyDeviceTensorToCPU(*device->eigen_sycl_device(), device_tensor,
+                          cpu_tensor, done);
+  }
 
-template<typename T>
-cl::sycl::nd_range<1> get_sycl_nd_range(const Eigen::SyclDevice& d, const T items) {
-  const size_t nb_items = static_cast<size_t>(items);
-  const size_t group_size = std::min(nb_items, get_max_work_item_tuple(d)[0]);
-  const size_t group_count = (nb_items + group_size - 1) / group_size;
+  static inline void copyDeviceTensorToDevice(Device *device,
+                                              const Tensor& src_tensor,
+                                              Tensor& dst_tensor) {
+    copyDeviceTensorToDevice(*device->eigen_sycl_device(), src_tensor,
+                             dst_tensor);
+  }
 
-  return cl::sycl::nd_range<1>(cl::sycl::range<1>(group_count * group_size),
-                               cl::sycl::range<1>(group_size));
-}
+  static inline void blockingCopyCPUTensorToDevice(Device* device,
+                                                   const Tensor& cpu_tensor,
+                                                   Tensor& device_tensor) {
+    blockingCopyCPUTensorToDevice(*device->eigen_sycl_device(), cpu_tensor,
+                                  device_tensor);
+  }
 
-template<typename T>
-cl::sycl::nd_range<2> get_sycl_nd_range(const Eigen::SyclDevice& d, const T item_dim0, const T item_dim1) {
-  const size_t nb_items = static_cast<size_t>(item_dim0);
-  const size_t group_size = std::min(nb_items, get_max_work_item_tuple(d)[0]);
-  const size_t group_count = (nb_items + group_size - 1) / group_size;
+  static inline void blockingCopyDeviceTensorToCPU(Device* device,
+                                                   const Tensor& device_tensor,
+                                                   Tensor& cpu_tensor) {
+    blockingCopyDeviceTensorToCPU(*device->eigen_sycl_device(), device_tensor,
+                                  cpu_tensor);
+  }
 
-  return cl::sycl::nd_range<2>(cl::sycl::range<2>(group_count * group_size, item_dim1),
-                               cl::sycl::range<2>(group_size, 1));
-}
+  static inline const cl::sycl::id<3>
+    get_max_work_item_tuple(const Eigen::SyclDevice& d) {
+    const auto& device = d.sycl_queue().get_device();
+    return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
+  }
+
+  template<typename T>
+  static inline cl::sycl::nd_range<1> get_nd_range(const Eigen::SyclDevice& d,
+                                                   const T items) {
+    const size_t nb_items = static_cast<size_t>(items);
+    const size_t group_size = std::min(nb_items,
+        SYCLUtil::get_max_work_item_tuple(d)[0]);
+    const size_t group_count = (nb_items + group_size - 1) / group_size;
+
+    return cl::sycl::nd_range<1>(cl::sycl::range<1>(group_count * group_size),
+                                 cl::sycl::range<1>(group_size));
+  }
+
+  template<typename T>
+  static inline cl::sycl::nd_range<2> get_nd_range(const Eigen::SyclDevice& d,
+                                                   const T item_dim0,
+                                                   const T item_dim1) {
+    const size_t nb_items = static_cast<size_t>(item_dim0);
+    const size_t group_size = std::min(nb_items,
+        SYCLUtil::get_max_work_item_tuple(d)[0]);
+    const size_t group_count = (nb_items + group_size - 1) / group_size;
+
+    return cl::sycl::nd_range<2>(
+        cl::sycl::range<2>(group_count * group_size, item_dim1),
+        cl::sycl::range<2>(group_size, 1));
+  }
+};
 
 }  // namespace tensorflow
 

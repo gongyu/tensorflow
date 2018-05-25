@@ -173,7 +173,7 @@ struct TileFunctor<SYCLDevice, T> {
           stride_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
       TileSYCL<T> functor(ndims, input_access, stride_access, output_access, nelem);
 
-      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, nelem);
+      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, nelem);
       cgh.parallel_for(nd_rng, functor);
     });
   }

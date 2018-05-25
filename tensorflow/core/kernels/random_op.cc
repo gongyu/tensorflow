@@ -654,7 +654,7 @@ void FillPhiloxRandom<SYCLDevice, Distribution>::operator()(
   device.sycl_queue().submit([&](cl::sycl::handler& cgh) {
     auto access =
       buffer.template get_access<cl::sycl::access::mode::write>(cgh);
-    cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(device, nb_items);
+    cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(device, nb_items);
 
     FillPhiloxRandomKernel<Distribution,
                            Distribution::kVariableSamplesPerOutput>
