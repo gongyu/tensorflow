@@ -79,7 +79,7 @@ class DeviceSpec(object):
     self.job = job
     self.replica = replica
     self.task = task
-    if device_type == "cpu" or device_type == "gpu":
+    if device_type == "cpu" or device_type == "gpu" or device_type == "sycl":
       # For backwards compatibility only, we support lowercase variants of
       # cpu and gpu but turn them into uppercase here.
       self.device_type = device_type.upper()
