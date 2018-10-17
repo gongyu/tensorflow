@@ -120,6 +120,7 @@ struct TensorEvaluator<const TensorConvolutionByFFTOp<Indices, InputArgType, Ker
                 TensorEvaluator<KernelArgType, Device>::IsAligned,
     PacketAccess = false,
     BlockAccess = false,
+    PreferBlockAccess = false,
     Layout = TensorEvaluator<InputArgType, Device>::Layout,
     CoordAccess = false,  // to be implemented
   };

@@ -372,16 +372,18 @@ struct reducer_traits<AvgPoolMeanReducer<float>, Device> {
     Cost = 1,
 #if (EIGEN_ARCH_i386 || EIGEN_ARCH_x86_64) && !defined(__CUDACC__) && !defined(__SYCL_DEVICE_ONLY__)
     // We only support packet access for floats.
-    PacketAccess = true
+    PacketAccess = true,
 #else
-    PacketAccess = false
+    PacketAccess = false,
 #endif
+    IsStateful = false,
+    IsExactlyAssociative = false
   };
 };
 
 template <>
 struct reducer_traits<AvgPoolMeanReducer<float>, GpuDevice> {
-  enum { Cost = 1, PacketAccess = false };
+  enum { Cost = 1, PacketAccess = false, IsStateful = false, IsExactlyAssociative = false };
 };
 
 }  // namespace internal
