@@ -105,6 +105,17 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   )
 
   tf_http_archive(
+      name = "sycl_dnn_archive",
+      urls = [
+          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/93d443d98d054a74d76723ab40c7be92b0ce1786.tar.gz",
+          "https://github.com/codeplaysoftware/SYCL-DNN/archive/93d443d98d054a74d76723ab40c7be92b0ce1786.tar.gz",
+      ],
+      sha256 = "ad30dfb32e0c3b6d1a251b78d9f6f7e96290b4b4de8fd21a510890a161e0bc48",
+      strip_prefix = "SYCL-DNN-93d443d98d054a74d76723ab40c7be92b0ce1786",
+      build_file = clean_dep("//third_party/sycl:sycl_dnn.BUILD"),
+  )
+
+  tf_http_archive(
       name = "com_google_absl",
       urls = [
           "https://mirror.bazel.build/github.com/abseil/abseil-cpp/archive/9613678332c976568272c8f4a78631a29159271d.tar.gz",

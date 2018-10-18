@@ -20,6 +20,10 @@ limitations under the License.
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/util/tensor_format.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "sycldnn/depthwise_conv2d/params.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 struct DepthwiseArgs {
@@ -55,6 +59,27 @@ struct DepthwiseArgs {
         out_cols(0),
         out_depth(0) {}
 };
+
+#ifdef TENSORFLOW_USE_SYCL
+inline sycldnn::depthwise_conv2d::DepthwiseConv2DParams get_sd_params(
+    const DepthwiseArgs& params) {
+  sycldnn::depthwise_conv2d::DepthwiseConv2DParams sd_params;
+  sd_params.channels = params.in_depth;
+  sd_params.channel_multiplier = params.depth_multiplier;
+  sd_params.batch = params.batch;
+  sd_params.in_rows = params.in_rows;
+  sd_params.in_cols = params.in_cols;
+  sd_params.window_rows = params.filter_rows;
+  sd_params.window_cols = params.filter_cols;
+  sd_params.stride_rows = params.stride;
+  sd_params.stride_cols = params.stride;
+  sd_params.out_rows = params.out_rows;
+  sd_params.out_cols = params.out_cols;
+  sd_params.pad_rows = params.pad_rows;
+  sd_params.pad_cols = params.pad_cols;
+  return sd_params;
+}
+#endif  // TENSORFLOW_USE_SYCL
 
 // Forward declaration.
 class OpKernelContext;

@@ -1345,20 +1345,31 @@ def set_trisycl_include_dir(environ_cp):
   write_action_env_to_bazelrc('TRISYCL_INCLUDE_DIR',
                               trisycl_include_dir)
 
-def set_sycl_data_types(environ_cp):
+def set_sycl_extra_options(environ_cp):
   """Set which data types are enabled for the SYCL configuration."""
   configs = ['sycl', 'sycl_asan', 'sycl_arm']
   use_half = int(
       get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
+  write_action_env_to_bazelrc('TF_USE_HALF_SYCL', use_half)
   if use_half == 0:
     for config in configs:
-      write_to_bazelrc('build:' + config + ' --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
+      write_to_bazelrc('build:{} --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1'.format(config))
 
   use_double = int(
       get_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True))
+  write_action_env_to_bazelrc('TF_USE_DOUBLE_SYCL', use_double)
   if use_double == 0:
     for config in configs:
-      write_to_bazelrc('build:' + config + ' --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
+      write_to_bazelrc('build:{} --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1'.format(config))
+
+  # No need to ask for another question regarding LOCAL_MEM,
+  # setting this environment variable to 0 or 1 can improve performances
+  # depending on whether the device used has local memory.
+  use_local_mem = environ_cp.get('TF_SYCL_USE_LOCAL_MEM', 'None')
+  write_action_env_to_bazelrc('TF_SYCL_USE_LOCAL_MEM', use_local_mem)
+  prefix = '' if use_local_mem else 'NO_'
+  for config in configs:
+    write_to_bazelrc('build:{} --cxxopt=-D{}LOCAL_MEM'.format(config, prefix))
 
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""
@@ -1497,7 +1508,7 @@ def main():
   set_action_env_var(environ_cp, 'TF_NEED_OPENCL_SYCL', 'OpenCL SYCL', False)
   if environ_cp.get('TF_NEED_OPENCL_SYCL') == '1':
     set_action_env_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
-    set_sycl_data_types(environ_cp)
+    set_sycl_extra_options(environ_cp)
     if environ_cp.get('TF_NEED_COMPUTECPP') == '1':
       set_computecpp_toolkit_path(environ_cp)
       set_computecpp_bitcode_target(environ_cp)

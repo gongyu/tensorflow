@@ -47,7 +47,12 @@ limitations under the License.
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
 #include "tensorflow/core/kernels/maxpooling_op_sycl.h"
+
+#include "sycldnn/pooling/launch.h"
+#include "sycldnn/pooling/operators.h"
+#include "sycldnn/backend/eigen_backend.h"
 #endif  // TENSORFLOW_USE_SYCL
 
 namespace tensorflow {
@@ -888,19 +893,6 @@ struct LaunchMaxPoolingWithArgmax<CPUDevice, T> {
   }
 };
 
-#ifdef TENSORFLOW_USE_SYCL
-template <typename T>
-struct LaunchMaxPoolingWithArgmax<SYCLDevice, T> {
-  static void launch(OpKernelContext* context, const PoolParameters& params,
-                     const Tensor& input, Tensor* output, Tensor* argmax,
-                     bool propagate_nans) {
-    Tensor unused;
-    SpatialMaxPoolWithArgMaxHelper<SYCLDevice, T>(
-        context, output, argmax, nullptr, input, unused, params);
-  }
-};
-#endif  // TENSORFLOW_USE_SYCL
-
 template <typename Device, typename T>
 class MaxPoolingWithArgmaxOp : public OpKernel {
  public:
@@ -1530,6 +1522,9 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     const Tensor& tensor_in = context->input(0);
     PoolParameters params{context,  ksize_,      stride_,
                           padding_, FORMAT_NHWC, tensor_in.shape()};
+
+    namespace sd = sycldnn::pooling;
+    sd::PoolingParams sd_params = get_sd_params(params);
     if (!context->status().ok()) {
       return;
     }
@@ -1538,12 +1533,26 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(
                                 0, params.forward_output_shape(), &output));
 
+    // This is not an error in TensorFlow, the context expect an empty output
+    // in this case.
+    if (sd_params.batch == 0)
+      return;
+
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+    auto in_ptr = tensor_in.template flat<T>().data();
+    auto out_ptr = output->template flat<T>().data();
     if (propagate_nans_) {
       LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
           context, tensor_in, params, output);
     } else {
-      LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(context, tensor_in,
-                                                          params, output);
+      auto status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 
@@ -1620,6 +1629,8 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
 
     PoolParameters params{context,  ksize,        stride,
                           padding_, data_format_, tensor_in.shape()};
+    namespace sd = sycldnn::pooling;
+    sd::PoolingParams sd_params = get_sd_params(params);
     if (!context->status().ok()) {
       return;
     }
@@ -1628,12 +1639,26 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(
                                 0, params.forward_output_shape(), &output));
 
+    // This is not an error in TensorFlow, the context expect an empty output
+    // in this case.
+    if (sd_params.batch == 0)
+      return;
+
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+    auto in_ptr = tensor_in.template flat<T>().data();
+    auto out_ptr = output->template flat<T>().data();
     if (propagate_nans_) {
       LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
           context, tensor_in, params, output);
     } else {
-      LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(context, tensor_in,
-                                                          params, output);
+      auto status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 
@@ -1644,6 +1669,7 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
   TensorFormat data_format_;
   bool propagate_nans_;
 };
+
 template <class T>
 class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
  public:
@@ -1727,6 +1753,9 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
 
     PoolParameters params{context,  ksize,       stride,
                           padding_, FORMAT_NHWC, tensor_in.shape()};
+
+    namespace sd = sycldnn::pooling;
+    sd::PoolingParams sd_params = get_sd_params(params);
     if (!context->status().ok()) {
       return;
     }
@@ -1735,12 +1764,28 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
     OP_REQUIRES_OK(context, context->forward_input_or_allocate_output(
                                 {0}, 0, output_shape, &output));
 
+    // This is not an error in TensorFlow, the context expect an empty output
+    // in this case.
+    if (sd_params.batch == 0)
+      return;
+
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+    auto in_data_ptr = tensor_in.template flat<T>().data();
+    auto out_data_ptr = tensor_out.template flat<T>().data();
+    auto backprop_ptr = out_backprop.template flat<T>().data();
+    auto out_ptr = output->template flat<T>().data();
     if (propagate_nans_) {
       LaunchMaxPoolingGradOpSYCL<T, EqualWithNans<T>>::launch(
           context, tensor_in, tensor_out, out_backprop, params, output);
     } else {
-      LaunchMaxPoolingGradOpSYCL<T, Equal<T>>::launch(
-          context, tensor_in, tensor_out, out_backprop, params, output);
+      auto status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
+          out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 
@@ -1877,6 +1922,7 @@ class MaxPoolingGradGradOp<SYCLDevice, T> : public OpKernel {
                               .TypeConstraint<T>("T"),            \
                           MaxPoolingV2Op<SYCLDevice, T>);         \
   REGISTER_MAX_POOL_KERNELS_SYCL(SYCL, T)
+//TODO(codeplay): Register MaxPoolWithArgmax and MaxPoolGradGradWithArgmax
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_MAX_POOL_KERNELS);
 #undef REGISTER_SYCL_MAX_POOL_KERNELS
 #undef REGISTER_MAX_POOL_KERNELS_SYCL

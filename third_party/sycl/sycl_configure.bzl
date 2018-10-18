@@ -12,6 +12,9 @@
   * TF_SYCL_BITCODE_TARGET: The SYCL bitcode target
   * TF_SYCL_CROSS_TOOLCHAIN: The path to the toolchain (only if cross-compiling)
   * TF_SYCL_CROSS_TOOLCHAIN_NAME: The name of the toolchain (only if cross-compiling)
+  * TF_USE_HALF_SYCL: Whether to support half type or not
+  * TF_USE_DOUBLE_SYCL: Whether to support double type or not
+  * TF_SYCL_USE_LOCAL_MEM: Whether to assume if the device has local memory or not
 """
 
 _HOST_CXX_COMPILER = "HOST_CXX_COMPILER"
@@ -23,6 +26,9 @@ _PYTHON_LIB_PATH = "PYTHON_LIB_PATH"
 _TF_SYCL_BITCODE_TARGET = "TF_SYCL_BITCODE_TARGET"
 _TF_SYCL_CROSS_TOOLCHAIN = "TF_SYCL_CROSS_TOOLCHAIN"
 _TF_SYCL_CROSS_TOOLCHAIN_NAME = "TF_SYCL_CROSS_TOOLCHAIN_NAME"
+_TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
+_TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
+_TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 
 def _enable_sycl(repository_ctx):
   if _TF_NEED_OPENCL_SYCL in repository_ctx.os.environ:
@@ -181,6 +187,50 @@ def _create_dummy_repository(repository_ctx):
                       _DUMMY_CROSSTOOL_BZL_FILE)
   repository_ctx.file("crosstool/BUILD", _DUMMY_CROSSTOOL_BUILD_FILE)
 
+def _get_sycldnn_substitutions(repository_ctx):
+  exports = []
+  cmake_options = []
+  use_computecpp = _enable_compute_cpp(repository_ctx)
+  computecpp_root = find_computecpp_root(repository_ctx) if use_computecpp else ""
+  if _crosscompile(repository_ctx):
+    gcc_toolchain_path = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN]
+    gcc_toolchain_name = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN_NAME]
+    platform_name = gcc_toolchain_name[0:gcc_toolchain_name.find('-')]
+    exports.append("export SNN_TOOLCHAIN_DIR={};".format(gcc_toolchain_path))
+    exports.append("export SNN_SYSROOT_DIR={}/{}/libc;".format(gcc_toolchain_path, gcc_toolchain_name))
+    exports.append("export SNN_TARGET_TRIPLE={};".format(gcc_toolchain_name))
+    cmake_options.append("-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc-generic.cmake")
+    cmake_options.append("-DCMAKE_SYSTEM_PROCESSOR={}".format(platform_name))
+    if use_computecpp:
+      cmake_options.append("-DComputeCpp_HOST_DIR={}".format(computecpp_root))
+
+  if use_computecpp:
+    cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
+  else:
+    cmake_options.append("-DSNN_TRISYCL=ON")
+  cmake_options.append("-DSNN_BUILD_TESTS=OFF")
+  cmake_options.append("-DSNN_BUILD_BENCHMARKS=OFF")
+  cmake_options.append("-DSNN_BUILD_SAMPLES=OFF")
+  cmake_options.append("-DSNN_BUILD_DOCUMENTATION=OFF")
+  cmake_options.append("-DSNN_CONV2D_DIRECT_STATIC_KERNELS=ON")
+  cmake_options.append("-DCMAKE_EXE_LINKER_FLAGS=-Wl,--enable-new-dtags")
+  cmake_options.append("-DCMAKE_CXX_FLAGS_RELEASE=-O3")
+
+  use_half = "ON" if repository_ctx.os.environ[_TF_USE_HALF_SYCL] != "0" else "OFF"
+  cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
+  use_double = "ON" if repository_ctx.os.environ[_TF_USE_DOUBLE_SYCL] != "0" else "OFF"
+  cmake_options.append("-DSNN_ENABLE_DOUBLE={}".format(use_double))
+
+  use_local_mem = repository_ctx.os.environ[_TF_SYCL_USE_LOCAL_MEM]
+  local_mem = "ON" if use_local_mem == "1" else "OFF"
+  no_local_mem = "ON" if use_local_mem == "0" else "OFF"
+  cmake_options.append("-DSNN_EIGEN_LOCAL_MEM={}".format(local_mem))
+  cmake_options.append("-DSNN_EIGEN_NO_LOCAL_MEM={}".format(no_local_mem))
+
+  return {
+    "%{SNN_EXPORTS}%" : ' '.join(exports),
+    "%{SNN_CMAKE_OPTIONS}%" : ' '.join(cmake_options)
+  }
 
 def _sycl_autoconf_impl(repository_ctx):
   """Implementation of the sycl_autoconf rule."""
@@ -199,7 +249,7 @@ def _sycl_autoconf_impl(repository_ctx):
   else:
     # copy template files
     _tpl(repository_ctx, "sycl:build_defs.bzl")
-    _tpl(repository_ctx, "sycl:BUILD")
+    _tpl(repository_ctx, "sycl:BUILD", _get_sycldnn_substitutions(repository_ctx))
     _tpl(repository_ctx, "crosstool:BUILD")
     _file(repository_ctx, "sycl:LICENSE.text")
 
@@ -216,13 +266,11 @@ def _sycl_autoconf_impl(repository_ctx):
         "%{BITCODE_FORMAT}%" : spir_type
       })
 
-      # symlink libraries
-      _check_lib(repository_ctx, computecpp_root+"/lib", "libComputeCpp.so" )
+      _check_lib(repository_ctx, computecpp_root + "/lib", "libComputeCpp.so" )
       _symlink_dir(repository_ctx, computecpp_root + "/lib", "sycl/lib")
       _symlink_dir(repository_ctx, computecpp_root + "/include", "sycl/include")
       _symlink_dir(repository_ctx, computecpp_root + "/bin", "sycl/bin")
     else:
-
       trisycl_include_dir = find_trisycl_include_dir(repository_ctx)
       _check_dir(repository_ctx, trisycl_include_dir)
 
@@ -232,7 +280,6 @@ def _sycl_autoconf_impl(repository_ctx):
         "%{host_c_compiler}" : find_c(repository_ctx),
         "%{trisycl_include_dir}" : trisycl_include_dir
       })
-
 
       _tpl(repository_ctx, "crosstool:CROSSTOOL",
       {

@@ -14,9 +14,13 @@
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
 #include "tensorflow/core/kernels/conv_grad_ops.h"
-
 #include "tensorflow/core/kernels/conv_ops_sycl_launcher.h"
+
+#include "sycldnn/conv2d/launch.h"
+#include "sycldnn/conv2d/selector/default_selector.h"
+#include "sycldnn/backend/eigen_backend.h"
 
 namespace tensorflow {
 typedef Eigen::SyclDevice SYCLDevice;
@@ -61,20 +65,37 @@ struct LaunchConv2DOp<SYCLDevice, T> {
                             stride_cols, out_rows,    out_cols,    pad_rows,
                             pad_cols};
 
+    // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
+    namespace sd = sycldnn::conv2d;
+    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
+                  "SYCLConv2DParams shouldn't be used anymore");
+    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+
     T const* const in_ptr = input.template flat<T>().data();
     T const* const fil_ptr = filter.template flat<T>().data();
     T* const out_ptr = output->template flat<T>().data();
 
-    SNN_SELECTOR sel;
-    if(data_format == FORMAT_NCHW) {
-    launch_conv2d_nchw<T, ConvType::Forward>(context->eigen_device<SYCLDevice>(),
-                                        in_ptr, fil_ptr, params, out_ptr, sel);
+    if (data_format == FORMAT_NCHW) {
+      SNN_SELECTOR sel;
+      launch_conv2d_nchw<T, ConvType::Forward>(
+          context->eigen_device<SYCLDevice>(),
+          in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-    launch_conv2d<T, ConvType::Forward>(context->eigen_device<SYCLDevice>(),
-                                        in_ptr, fil_ptr, params, out_ptr, sel);
+      auto selector = sycldnn::conv2d::get_default_selector(
+          device.sycl_queue().get_device());
+      auto status = sd::launch<T, sd::conv_type::Forward>(
+          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 };
+
 template <typename T>
 struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
   void operator()(OpKernelContext* context, bool /*use_cudnn*/,
@@ -112,21 +133,37 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
                             stride_cols, out_rows,    out_cols,    pad_rows,
                             pad_cols};
 
+    // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
+    namespace sd = sycldnn::conv2d;
+    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
+                  "SYCLConv2DParams shouldn't be used anymore");
+    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+
     T const* const in_ptr = out_backprop.template flat<T>().data();
     T const* const fil_ptr = filter.template flat<T>().data();
     T* const out_ptr = in_backprop->template flat<T>().data();
 
-    SNN_SELECTOR sel;
-    if(data_format == FORMAT_NCHW) {
-    launch_conv2d_nchw<T, ConvType::InputBackprop>(context->eigen_device<SYCLDevice>(),
-                                        in_ptr, fil_ptr, params, out_ptr, sel);
+    if (data_format == FORMAT_NCHW) {
+      SNN_SELECTOR sel;
+      launch_conv2d_nchw<T, ConvType::InputBackprop>(
+          context->eigen_device<SYCLDevice>(),
+          in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-    launch_conv2d<T, ConvType::InputBackprop>(
-        context->eigen_device<SYCLDevice>(), in_ptr, fil_ptr, params, out_ptr,
-        sel);
+      auto selector = sycldnn::conv2d::get_default_selector(
+          device.sycl_queue().get_device());
+      auto status = sd::launch<T, sd::conv_type::InputBackprop>(
+          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 };
+
 template <typename T>
 struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
   void operator()(OpKernelContext* context, bool /*use_cudnn*/,
@@ -164,18 +201,33 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
                             stride_cols, out_rows,    out_cols,    pad_rows,
                             pad_cols};
 
+    // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
+    namespace sd = sycldnn::conv2d;
+    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
+                  "SYCLConv2DParams shouldn't be used anymore");
+    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto device = context->eigen_device<SYCLDevice>();
+    sycldnn::backend::EigenBackend backend(device);
+
     T const* const in_ptr = input.template flat<T>().data();
     T const* const fil_ptr = out_backprop.template flat<T>().data();
     T* const out_ptr = filter_backprop->template flat<T>().data();
 
-    SNN_SELECTOR sel;
-    if(data_format == FORMAT_NCHW) {
-    launch_conv2d_nchw<T, ConvType::FilterBackprop>(context->eigen_device<SYCLDevice>(),
-                                        in_ptr, fil_ptr, params, out_ptr, sel);
+    if (data_format == FORMAT_NCHW) {
+      SNN_SELECTOR sel;
+      launch_conv2d_nchw<T, ConvType::FilterBackprop>(
+          context->eigen_device<SYCLDevice>(),
+          in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-    launch_conv2d<T, ConvType::FilterBackprop>(
-        context->eigen_device<SYCLDevice>(), in_ptr, fil_ptr, params, out_ptr,
-        sel);
+      auto selector = sycldnn::conv2d::get_default_selector(
+          device.sycl_queue().get_device());
+      auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
+          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
+      }
+      status.event.wait();
     }
   }
 };

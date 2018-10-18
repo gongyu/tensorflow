@@ -3290,6 +3290,9 @@ tf_kernel_library(
     }) + if_cuda([
         "//tensorflow/core/platform/default/build_config:cublas_plugin",
         "//tensorflow/core/platform/default/build_config:cudnn_plugin",
+    ]) + if_sycl([
+        "//tensorflow/core:sycl_runtime",
+        "@local_config_sycl//sycl:sycl_dnn",
     ]),
 )
 

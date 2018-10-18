@@ -27,6 +27,7 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor.h"
 
 namespace tensorflow {
+
 inline void const* GetBase(const Tensor* src) { return DMAHelper::base(src); }
 inline void* GetBase(Tensor* dst) { return DMAHelper::base(dst); }
 
@@ -75,6 +76,13 @@ inline void SYCLmemcpy(Eigen::SyclDevice const& device,
   }
 #undef COPY_WITH_TYPE
 }
+
+template <class SDStatus>
+inline Status get_sd_err_msg(const SDStatus& s) {
+  return errors::Internal("Internal error from SYCL-DNN code " +
+      std::to_string(static_cast<int>(s.status)));
+}
+
 }  // namespace tensorflow
 
 #endif  // TENSORFLOW_CORE_COMMON_RUNTIME_SYCL_SYCL_UTIL_H_

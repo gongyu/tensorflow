@@ -17,7 +17,6 @@ limitations under the License.
 
 #define USE_EIGEN_TENSOR
 #define EIGEN_USE_THREADS
-#define TF_USE_SYCLDNN
 
 #if GOOGLE_CUDA
 #define EIGEN_USE_GPU
@@ -58,7 +57,7 @@ limitations under the License.
 #include "tensorflow/core/platform/stream_executor.h"
 #endif  // GOOGLE_CUDA
 
-#if defined(TF_USE_SYCLDNN) && defined(TENSORFLOW_USE_SYCL)
+#ifdef TENSORFLOW_USE_SYCL
 #include "tensorflow/core/kernels/conv_ops_sycl.h"
 #endif  // TENSORFLOW_USE_SYCL
 
@@ -890,8 +889,7 @@ template struct LaunchConv2DOp<GPUDevice, double>;
   REGISTER_KERNEL_BUILDER(                                       \
       Name("Conv2D").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
       Conv2DOp<SYCLDevice, T>);
-//TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
-TF_CALL_float(REGISTER_SYCL_KERNELS)
+TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_KERNELS)
 #undef REGISTER_SYCL_KERNELS
 #endif  // TENSORFLOW_USE_SYCL
 #endif  // !defined(USE_GEMM_FOR_CONV)

@@ -32,3 +32,30 @@ cc_library(
     includes = [".", "include"],
     deps = ["@opencl_headers//:OpenCL-Headers"],
 )
+
+genrule(
+    name = "snn_genrule",
+    srcs = ["@sycl_dnn_archive//:snn_repo"],
+    outs = ["libsycldnn_static.a"],
+    # Below $_ holds the last argument of the previous command,
+    # the extra $ is needed for bazel shell cmd.
+    # The build directory depends on TARGET_CPU as the host and sycl
+    # toolchains are both building SYCL-DNN in parallel.
+    # An empty archive is enough for the host.
+    cmd = "cd external/sycl_dnn_archive && " +
+          "mkdir build_`echo $(TARGET_CPU)` && cd $$_ && " +
+          "if [[ \"$@\" =~ \"host\" ]]; then " +
+          "  ar rcs libsycldnn_static.a; " +
+          "else " +
+          "  %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log && " +
+          "  make sycl_dnn_static > make_log; " +
+          "fi && " +
+          "cp -f libsycldnn_static.a `dirname ../../../$@`",
+)
+
+cc_library(
+    name = "sycl_dnn",
+    srcs = ["libsycldnn_static.a"],
+    deps = ["@sycl_dnn_archive//:snn_headers"],
+    linkstatic = 1,
+)

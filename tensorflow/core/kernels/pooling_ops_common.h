@@ -33,6 +33,10 @@ limitations under the License.
 #include "tensorflow/core/kernels/maxpooling_op_gpu.h"
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "sycldnn/pooling/params.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 typedef Eigen::GpuDevice GPUDevice;
@@ -73,9 +77,26 @@ struct PoolParameters {
 };
 
 #ifdef TENSORFLOW_USE_SYCL
+inline sycldnn::pooling::PoolingParams get_sd_params(const PoolParameters& params) {
+  sycldnn::pooling::PoolingParams sd_params;
+  sd_params.in_rows = params.tensor_in_rows;
+  sd_params.in_cols = params.tensor_in_cols;
+  sd_params.out_rows = params.out_height;
+  sd_params.out_cols = params.out_width;
+  sd_params.window_rows = params.window_rows;
+  sd_params.window_cols = params.window_cols;
+  sd_params.stride_rows = params.row_stride;
+  sd_params.stride_cols = params.col_stride;
+  sd_params.batch = params.tensor_in_batch;
+  sd_params.channels = params.depth;
+  sd_params.pad_rows = params.pad_rows;
+  sd_params.pad_cols = params.pad_cols;
+  return sd_params;
+}
 // Helper struct to contain the various pool parameters used in the SYCL
 // pooling kernels in 2D. Similar to the PoolParameters,
 // but with a number of convenient constructors.
+//TODO(codeplay): remove later
 struct SYCL2DPoolParams {
   SYCL2DPoolParams(const int depth, const int batch, const int in_rows,
                    const int in_cols, const int out_rows, const int out_cols,
