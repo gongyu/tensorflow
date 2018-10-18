@@ -20,6 +20,10 @@ limitations under the License.
 #include "tensorflow/core/kernels/ops_util.h"
 #include "tensorflow/core/kernels/tile_functor.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 namespace functor {
@@ -103,26 +107,30 @@ struct TileSYCL {
       cl::sycl::accessor<int64, 2, cl::sycl::access::mode::read,
                          cl::sycl::access::target::global_buffer>;
   TileSYCL(int ndims, const read_accessor input,
-           const stride_read_accessor strides, write_accessor output)
+           const stride_read_accessor strides, write_accessor output,
+           const unsigned int size)
       : ndims_(ndims),
         input_accessor_(input),
         stride_accessor_(strides),
-        output_accessor_(output) {}
+        output_accessor_(output),
+        size_(size) {}
 
-  void operator()(cl::sycl::item<1> id) {
+  void operator()(cl::sycl::nd_item<1> id) {
     const T* input = ConvertToActualTypeSycl(T, input_accessor_);
     T* output = ConvertToActualTypeSycl(T, output_accessor_);
 
-    const int64 o_idx = id.get_linear_id();
+    const size_t item_id = id.get_global_id(0);
+    if (item_id >= size_)
+      return;
     int64 i_idx = 0;
-    int64 t = o_idx;
+    int64 t = item_id;
     for (int i = 0; i < ndims_; ++i) {
       i_idx += ((t / stride_accessor_[cl::sycl::id<2>(1, i)]) %
                 stride_accessor_[cl::sycl::id<2>(2, i)]) *
                stride_accessor_[cl::sycl::id<2>(0, i)];
       t %= stride_accessor_[cl::sycl::id<2>(1, i)];
     }
-    output[o_idx] = input[i_idx];
+    output[item_id] = input[i_idx];
   }
 
  private:
@@ -130,6 +138,7 @@ struct TileSYCL {
   const read_accessor input_accessor_;
   const stride_read_accessor stride_accessor_;
   write_accessor output_accessor_;
+  const unsigned int size_;
 };
 
 template <typename T>
@@ -162,9 +171,10 @@ struct TileFunctor<SYCLDevice, T> {
           output_buffer.template get_access<cl::sycl::access::mode::write>(cgh);
       auto stride_access =
           stride_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      TileSYCL<T> functor(ndims, input_access, stride_access, output_access);
+      TileSYCL<T> functor(ndims, input_access, stride_access, output_access, nelem);
 
-      cgh.parallel_for(cl::sycl::range<1>(nelem), functor);
+      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, nelem);
+      cgh.parallel_for(nd_rng, functor);
     });
   }
 };

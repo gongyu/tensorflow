@@ -30,6 +30,10 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/gpu/gpu_event_mgr.h"
 #include "tensorflow/core/platform/cuda.h"
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
@@ -287,20 +291,17 @@ class CheckNumericsOp<SYCLDevice, T> : public OpKernel {
     auto input_buffer = d.get_sycl_buffer(in.data());
     auto output_buffer = d.get_sycl_buffer(out.data());
 
-    const size_t group_size = d.getNearestPowerOfTwoWorkGroupSize();
-    const size_t group_count = (in.size() + group_size - 1) / group_size;
-
     d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
       auto input_access =
         input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
       auto output_access = output_buffer.template get_access<
                              cl::sycl::access::mode::discard_write>(cgh);
 
+      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, in.size());
       auto kernel = CheckNumericsKernel<T>{input_access, output_access, in.size()};
 
       // Kernel writes if any value was inf or nan to out
-      cgh.parallel_for(cl::sycl::nd_range<1>(cl::sycl::range<1>(group_size * group_count),
-                                             cl::sycl::range<1>(group_size)), kernel);
+      cgh.parallel_for(nd_rng, kernel);
     });
     std::array<bool, 2> host_out;
     d.memcpyDeviceToHost(host_out.data(), out.data(), 2 * sizeof(bool));

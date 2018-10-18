@@ -34,6 +34,10 @@ limitations under the License.
 #include "tensorflow/core/util/guarded_philox_random.h"
 #include "tensorflow/core/util/work_sharder.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 #if EIGEN_COMP_GNUC && __cplusplus > 199711L
 #define DISABLE_FLOAT_EQUALITY_WARNING \
   _Pragma("GCC diagnostic push")       \
@@ -644,17 +648,13 @@ void FillPhiloxRandom<SYCLDevice, Distribution>::operator()(
 
   const size_t nb_items = (size + Distribution::kResultElementCount - 1) /
                            Distribution::kResultElementCount;
-  const size_t group_size = std::min(nb_items,
-      device.getNearestPowerOfTwoWorkGroupSize());
-  const size_t group_count = (nb_items + group_size - 1) / group_size;
 
   auto buffer = device.get_sycl_buffer(data);
 
   device.sycl_queue().submit([&](cl::sycl::handler& cgh) {
     auto access =
       buffer.template get_access<cl::sycl::access::mode::write>(cgh);
-    cl::sycl::nd_range<1> nd_rng(cl::sycl::range<1>(group_count * group_size),
-                                 cl::sycl::range<1>(group_size));
+    cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(device, nb_items);
 
     FillPhiloxRandomKernel<Distribution,
                            Distribution::kVariableSamplesPerOutput>

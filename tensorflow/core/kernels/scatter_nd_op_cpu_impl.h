@@ -35,6 +35,10 @@ limitations under the License.
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/util.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
@@ -287,10 +291,6 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
     auto updates_buffer = d.get_sycl_buffer(Tupdates.data());
     auto output_buffer = d.get_sycl_buffer(Toutput.data());
 
-    const size_t group_size = std::min(static_cast<size_t>(slice_size),
-                                       d.getNearestPowerOfTwoWorkGroupSize());
-    const size_t group_count = (slice_size + group_size - 1) / group_size;
-
     d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
       auto indices_access =
           indices_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
@@ -300,12 +300,13 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
       auto output_access =
           output_buffer.template get_access<cl::sycl::access::mode::read_write>(cgh);
 
+      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, slice_size);
+
       ScatterNdKernel<T, Index, OP, IXDIM> kernel(
           indices_access, updates_access, output_access, batch_size,
           slice_size, Toutput.size(), batch_strides);
 
-      cgh.parallel_for(cl::sycl::nd_range<1>(cl::sycl::range<1>(group_size * group_count),
-                                             cl::sycl::range<1>(group_size)), kernel);
+      cgh.parallel_for(nd_rng, kernel);
     });
 
     return -1;

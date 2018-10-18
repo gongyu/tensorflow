@@ -83,6 +83,31 @@ inline Status get_sd_err_msg(const SDStatus& s) {
       std::to_string(static_cast<int>(s.status)));
 }
 
+inline const cl::sycl::id<3> get_max_work_item_tuple(const Eigen::SyclDevice& d) {
+  const auto& device = d.sycl_queue().get_device();
+  return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
+}
+
+template<typename T>
+cl::sycl::nd_range<1> get_sycl_nd_range(const Eigen::SyclDevice& d, const T items) {
+  const size_t nb_items = static_cast<size_t>(items);
+  const size_t group_size = std::min(nb_items, get_max_work_item_tuple(d)[0]);
+  const size_t group_count = (nb_items + group_size - 1) / group_size;
+
+  return cl::sycl::nd_range<1>(cl::sycl::range<1>(group_count * group_size),
+                               cl::sycl::range<1>(group_size));
+}
+
+template<typename T>
+cl::sycl::nd_range<2> get_sycl_nd_range(const Eigen::SyclDevice& d, const T item_dim0, const T item_dim1) {
+  const size_t nb_items = static_cast<size_t>(item_dim0);
+  const size_t group_size = std::min(nb_items, get_max_work_item_tuple(d)[0]);
+  const size_t group_count = (nb_items + group_size - 1) / group_size;
+
+  return cl::sycl::nd_range<2>(cl::sycl::range<2>(group_count * group_size, item_dim1),
+                               cl::sycl::range<2>(group_size, 1));
+}
+
 }  // namespace tensorflow
 
 #endif  // TENSORFLOW_CORE_COMMON_RUNTIME_SYCL_SYCL_UTIL_H_

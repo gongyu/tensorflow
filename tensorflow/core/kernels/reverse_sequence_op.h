@@ -21,6 +21,10 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor_types.h"
 #include "tensorflow/core/platform/types.h"
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 #ifdef TENSORFLOW_USE_SYCL
@@ -90,10 +94,12 @@ struct ReverseSequenceKernelSYCL {
 
   ReverseSequenceKernelSYCL(int32 batch_dim, int32 seq_dim,
       const Eigen::DSizes<Eigen::DenseIndex, Dims>& coord_dims,
-      r_acc seq_lengths_acc, r_acc input_acc, dw_acc output_acc)
+      r_acc seq_lengths_acc, r_acc input_acc, dw_acc output_acc,
+      const unsigned int size)
     : batch_dim_(batch_dim), seq_dim_(seq_dim),
       coord_dims_(coord_dims), seq_lengths_acc_(seq_lengths_acc),
-      input_acc_(input_acc), output_acc_(output_acc) {}
+      input_acc_(input_acc), output_acc_(output_acc),
+      size_(size) {}
 
   // Unflatten the indices and return the dimension dim
   inline int32 get_coord_dim(const int32 coord, const int32 dim) const {
@@ -106,11 +112,13 @@ struct ReverseSequenceKernelSYCL {
     return (coord % mod) / div;
   }
 
-  inline void operator()(cl::sycl::item<1> item) {
+  inline void operator()(cl::sycl::nd_item<1> item) {
     Tlen* seq_lengths = ConvertToActualTypeSycl(Tlen, seq_lengths_acc_);
     T* input = ConvertToActualTypeSycl(T, input_acc_);
     T* output = ConvertToActualTypeSycl(T, output_acc_);
-    const auto coord = item.get_id(0);
+    const auto coord = item.get_global_id(0);
+    if (coord >= size_)
+      return;
     auto new_coord = coord;
     auto coord_seq_dim = get_coord_dim(coord, seq_dim_);
     auto coord_batch_dim = get_coord_dim(coord, batch_dim_);
@@ -131,6 +139,7 @@ struct ReverseSequenceKernelSYCL {
   r_acc seq_lengths_acc_;
   r_acc input_acc_;
   dw_acc output_acc_;
+  const unsigned int size_;
 };
 
 template <typename T, typename Tlen, size_t Dims>
@@ -154,8 +163,10 @@ struct ReverseSequence<SYCLDevice, T, Tlen, Dims> {
       auto output_acc =
         output_buffer.template get_access<mode::discard_write>(cgh);
       ReverseSequenceKernelSYCL<T, Tlen, Dims> kernel(batch_dim, seq_dim,
-          coord_dims, seq_lengths_acc, input_acc, output_acc);
-      cgh.parallel_for(cl::sycl::range<1>(input.size()), kernel);
+          coord_dims, seq_lengths_acc, input_acc, output_acc, input.size());
+
+      cl::sycl::nd_range<1> nd_rng = get_sycl_nd_range(d, input.size());
+      cgh.parallel_for(nd_rng, kernel);
     });
   }
 };

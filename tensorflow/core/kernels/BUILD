@@ -2750,7 +2750,7 @@ MATH_DEPS = [
     "//tensorflow/core:math_grad",
     "//tensorflow/core:math_ops_op_lib",
     "//third_party/eigen3",
-]
+] + if_sycl(["//tensorflow/core:sycl_runtime"])
 
 cc_library(
     name = "math_not_windows",
@@ -3806,7 +3806,7 @@ RANDOM_OPS_DEPS = [
     "//tensorflow/core:lib",
     "//tensorflow/core:lib_internal",
     "//tensorflow/core:random_ops_op_lib",
-]
+] + if_sycl(["//tensorflow/core:sycl_runtime"])
 
 tf_kernel_library(
     name = "random_op",

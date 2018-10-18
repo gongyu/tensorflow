@@ -36,6 +36,10 @@ limitations under the License.
 #include "tensorflow/core/util/stream_executor_util.h"
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 namespace {
@@ -272,17 +276,20 @@ struct LRNKernelSYCL {
                        cl::sycl::access::target::global_buffer>;
 
   LRNKernelSYCL(int depth, int depth_radius, T bias, T alpha, T beta,
-                r_acc in_acc, dw_acc out_acc)
+                r_acc in_acc, dw_acc out_acc, const int rows, const int cols)
     : depth_(depth), depth_radius_(depth_radius), bias_(bias), alpha_(alpha),
-      binary_op_(BinaryOp(beta)), in_acc_(in_acc), out_acc_(out_acc) {}
+      binary_op_(BinaryOp(beta)), in_acc_(in_acc), out_acc_(out_acc),
+      rows_(rows), cols_(cols) {}
 
-  inline void operator()(cl::sycl::item<2> item) {
+  inline void operator()(cl::sycl::nd_item<2> item) {
     T* in_data = ConvertToActualTypeSycl(T, in_acc_);
     T* out_data = ConvertToActualTypeSycl(T, out_acc_);
 
-    const auto id = item.get_linear_id();
-    const int row = item.get_id(0);
-    const int col = item.get_id(1);
+    const auto id = item.get_global_linear_id();
+    const int row = item.get_global_id(0);
+    const int col = item.get_global_id(1);
+    if (row >= rows_ || col >= cols_)
+      return;
     const int base_id = row * depth_;
     int start_col = col - depth_radius_;
     int band_width = 2 * depth_radius_ + 1;
@@ -309,6 +316,7 @@ struct LRNKernelSYCL {
   BinaryOp binary_op_;
   r_acc in_acc_;
   dw_acc out_acc_;
+  const int rows_, cols_;
 };
 
 } //namespace
@@ -325,7 +333,6 @@ struct LaunchLRN<SYCLDevice, T> {
     const int cols = static_cast<int>(in.dim_size(2));
     const int depth = static_cast<int>(in.dim_size(3));
     const int reshaped_rows = batch * rows * cols;
-    cl::sycl::range<2> rng(reshaped_rows, depth);
 
     auto device = context->eigen_sycl_device();
     auto in_buffer = device.get_sycl_buffer(in.template flat<T>().data());
@@ -333,21 +340,25 @@ struct LaunchLRN<SYCLDevice, T> {
 
     auto sycl_queue = device.sycl_queue();
     sycl_queue.submit([&](cl::sycl::handler& cgh) {
+      cl::sycl::nd_range<2> rng = get_sycl_nd_range(device, reshaped_rows, depth);
       auto in_acc = in_buffer.template get_access<
                       cl::sycl::access::mode::read>(cgh);
       auto out_acc = out_buffer.template get_access<
                        cl::sycl::access::mode::discard_write>(cgh);
       if (beta_ == T(1)) {
         LRNKernelSYCL<T, LRNInvSYCL<T>>
-          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc);
+          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc,
+                 reshaped_rows, depth);
         cgh.parallel_for(rng, kernel);
       } else if (beta_ == T(0.5)) {
         LRNKernelSYCL<T, LRNRsqrtSYCL<T>>
-          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc);
+          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc,
+                 reshaped_rows, depth);
         cgh.parallel_for(rng, kernel);
       } else {
         LRNKernelSYCL<T, LRNGenSYCL<T>>
-          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc);
+          kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc,
+                 reshaped_rows, depth);
         cgh.parallel_for(rng, kernel);
       }
     });
