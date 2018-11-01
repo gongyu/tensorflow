@@ -191,21 +191,46 @@ struct Expector<T, true> {
     }
   }
 
-  static void Near(const T& a, const T& b, const double abs_err, int index) {
-    if (a != b) {  // Takes care of inf.
-      EXPECT_LE(double(Eigen::numext::abs(a - b)), abs_err)
-          << "a = " << a << " b = " << b << " index = " << index;
+  struct NearAbs {
+    void operator()(const T& a, const T& b, const double abs_err, const int index) {
+      if (a != b) {  // Takes care of inf.
+        EXPECT_LE(double(Eigen::numext::abs(a - b)), abs_err)
+            << "a = " << a << " b = " << b << " index = " << index;
+      }
     }
-  }
+  };
 
-  static void Near(const Tensor& x, const Tensor& y, const double abs_err) {
+  struct NearRel {
+    void operator()(const T& a, const T& b, const double rel_err, const int index) {
+      if (a == b) {  // Takes care of inf.
+        return;
+      }
+
+      const double diff = double(Eigen::numext::abs(a - b));
+      const T min_fp = std::numeric_limits<T>::min();
+      if (a == 0 || b == 0 || diff < min_fp) {  // Corner cases for small diff
+        EXPECT_LE(diff, rel_err * min_fp)
+            << "a = " << a << " b = " << b << " index = " << index;
+      }
+      else {
+        const double abs_a = double(Eigen::numext::abs(a));
+        const double abs_b = double(Eigen::numext::abs(b));
+        EXPECT_LE(diff, rel_err * std::max(abs_a, abs_b))
+            << "a = " << a << " b = " << b << " index = " << index;
+      }
+    }
+  };
+
+  template <typename Compare>
+  static void Run(const Tensor& x, const Tensor& y, const double err,
+                  Compare comp = Compare()) {
     ASSERT_EQ(x.dtype(), DataTypeToEnum<T>::v());
     AssertSameTypeDims(x, y);
     const auto size = x.NumElements();
     const T* a = x.flat<T>().data();
     const T* b = y.flat<T>().data();
     for (int i = 0; i < size; ++i) {
-      Near(a[i], b[i], abs_err, i);
+      comp(a[i], b[i], err, i);
     }
   }
 };
@@ -221,7 +246,17 @@ template <typename T>
 void ExpectTensorNear(const Tensor& x, const Tensor& y, const double abs_err) {
   static_assert(internal::is_floating_point_type<T>::value,
                 "T is not a floating point types.");
-  internal::Expector<T>::Near(x, y, abs_err);
+  using Expect = typename internal::Expector<T>;
+  Expect::template Run<typename Expect::NearAbs>(x, y, abs_err);
+}
+
+template <typename T>
+void ExpectTensorNearRel(const Tensor& x, const Tensor& y,
+                         const double rel_err) {
+  static_assert(internal::is_floating_point_type<T>::value,
+                "T is not a floating point types.");
+  using Expect = typename internal::Expector<T>;
+  Expect::template Run<typename Expect::NearRel>(x, y, rel_err);
 }
 
 }  // namespace test
