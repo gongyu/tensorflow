@@ -30,6 +30,8 @@ _TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
 _TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 
+_COMPUTECPP_MIN_VERSION = 102
+
 def _enable_sycl(repository_ctx):
   if _TF_NEED_OPENCL_SYCL in repository_ctx.os.environ:
     enable_sycl = repository_ctx.os.environ[_TF_NEED_OPENCL_SYCL].strip()
@@ -72,13 +74,29 @@ def find_cc(repository_ctx):
     fail("Cannot find C++ compiler, please correct your path.")
   return cc
 
+def prettify_version(ver):
+  str_ver = str(ver)
+  # Equivalent of zfill(3)
+  str_ver = '0' * (3 - len(str_ver)) + str_ver
+  return "CE {}.{}.{}".format(str_ver[0], str_ver[1], str_ver[2])
+
+def check_computecpp_version(repository_ctx, computecpp_path):
+  computecpp_info_cmd = "{}/bin/computecpp_info".format(computecpp_path)
+  result = repository_ctx.execute([computecpp_info_cmd, "--dump-version"], quiet=True)
+  output = result.stdout
+  current_version = int(output[3] + output[5] + output[7])
+  if current_version < _COMPUTECPP_MIN_VERSION:
+    fail("Found ComputeCpp version {} but expected at least {}".format(
+          prettify_version(current_version), prettify_version(_COMPUTECPP_MIN_VERSION)))
+
 def find_computecpp_root(repository_ctx):
   """Find ComputeCpp compiler."""
-  sycl_name = ""
+  computecpp_path = ""
   if _COMPUTECPP_TOOLKIT_PATH in repository_ctx.os.environ:
-    sycl_name = repository_ctx.os.environ[_COMPUTECPP_TOOLKIT_PATH].strip()
-  if sycl_name.startswith("/"):
-    return sycl_name
+    computecpp_path = repository_ctx.os.environ[_COMPUTECPP_TOOLKIT_PATH].strip()
+  if computecpp_path.startswith("/"):
+    check_computecpp_version(repository_ctx, computecpp_path)
+    return computecpp_path
   fail("Cannot find SYCL compiler, please correct your path")
 
 def find_trisycl_include_dir(repository_ctx):
