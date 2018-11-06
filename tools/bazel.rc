@@ -47,7 +47,7 @@ build:acl --copt=-DARM_COMPUTE_NO_EXCEPTIONS
 
 build:sycl --crosstool_top=@local_config_sycl//crosstool:toolchain
 build:sycl --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build:sycl --define=using_sycl=true --define=using_trisycl=false
+build:sycl --define=using_sycl=true
 build:sycl --copt -DUSE_DEFAULT_SELECTOR=1
 
 build:sycl_asan --config=sycl
@@ -60,10 +60,6 @@ build:sycl_asan --linkopt -fsanitize=address
 build:sycl_arm --config=sycl
 build:sycl_arm --cpu=armeabi
 build:sycl_arm --copt=-DARM_NON_MOBILE
-
-build:sycl_trisycl --crosstool_top=@local_config_sycl//crosstool:toolchain
-build:sycl_trisycl --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build:sycl_trisycl --define=using_sycl=true --define=using_trisycl=true
 
 build --define=use_fast_cpp_protos=true
 build --define=allow_oversize_protos=true

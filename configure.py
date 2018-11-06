@@ -1274,8 +1274,8 @@ def set_other_cuda_vars(environ_cp):
       write_to_bazelrc('test --config=cuda')
 
 
-def set_computecpp_toolkit_path(environ_cp):
-  """Set COMPUTECPP_TOOLKIT_PATH."""
+def set_computecpp_vars(environ_cp):
+  """Set COMPUTECPP_TOOLKIT_PATH and TF_SYCL_BITCODE_TARGET."""
 
   def toolkit_exists(toolkit_path):
     """Check if a computecpp toolkit path is valid."""
@@ -1302,13 +1302,9 @@ def set_computecpp_toolkit_path(environ_cp):
       check_success=toolkit_exists,
       error_msg='Invalid SYCL compiler path. %s cannot be found.',
       suppress_default_error=True)
-
   write_action_env_to_bazelrc('COMPUTECPP_TOOLKIT_PATH',
                               computecpp_toolkit_path)
 
-
-def set_computecpp_bitcode_target(environ_cp):
-  """Set the SYCL target bitcode to compile IR for."""
   default_target = 'spir64'
   ask_sycl_target = ('Please specify which bitcode to target when compiling '
                      'SYCL code. [Default is %s]: ') % (default_target)
@@ -1319,6 +1315,7 @@ def set_computecpp_bitcode_target(environ_cp):
 
   environ_cp['TF_SYCL_BITCODE_TARGET'] = sycl_target
   write_action_env_to_bazelrc('TF_SYCL_BITCODE_TARGET', sycl_target)
+  write_to_bazelrc('build:sycl --define using_trisycl=false')
 
 
 def set_trisycl_include_dir(environ_cp):
@@ -1344,23 +1341,21 @@ def set_trisycl_include_dir(environ_cp):
   environ_cp['TRISYCL_INCLUDE_DIR'] = trisycl_include_dir
   write_action_env_to_bazelrc('TRISYCL_INCLUDE_DIR',
                               trisycl_include_dir)
+  write_to_bazelrc('build:sycl --define using_trisycl=true')
 
 def set_sycl_extra_options(environ_cp):
   """Set which data types are enabled for the SYCL configuration."""
-  configs = ['sycl', 'sycl_asan', 'sycl_arm']
   use_half = int(
       get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
   write_action_env_to_bazelrc('TF_USE_HALF_SYCL', use_half)
   if use_half == 0:
-    for config in configs:
-      write_to_bazelrc('build:{} --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1'.format(config))
+    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1'.format(config))
 
   use_double = int(
       get_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True))
   write_action_env_to_bazelrc('TF_USE_DOUBLE_SYCL', use_double)
   if use_double == 0:
-    for config in configs:
-      write_to_bazelrc('build:{} --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1'.format(config))
+    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1'.format(config))
 
   # No need to ask for another question regarding LOCAL_MEM,
   # setting this environment variable to 0 or 1 can improve performances
@@ -1368,8 +1363,7 @@ def set_sycl_extra_options(environ_cp):
   use_local_mem = environ_cp.get('TF_SYCL_USE_LOCAL_MEM', 'None')
   write_action_env_to_bazelrc('TF_SYCL_USE_LOCAL_MEM', use_local_mem)
   prefix = '' if use_local_mem else 'NO_'
-  for config in configs:
-    write_to_bazelrc('build:{} --cxxopt=-D{}LOCAL_MEM'.format(config, prefix))
+  write_to_bazelrc('build:sycl --cxxopt=-D{}LOCAL_MEM'.format(config, prefix))
 
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""
@@ -1507,11 +1501,10 @@ def main():
 
   set_action_env_var(environ_cp, 'TF_NEED_OPENCL_SYCL', 'OpenCL SYCL', False)
   if environ_cp.get('TF_NEED_OPENCL_SYCL') == '1':
-    set_action_env_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
+    use_computecpp = get_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
     set_sycl_extra_options(environ_cp)
-    if environ_cp.get('TF_NEED_COMPUTECPP') == '1':
-      set_computecpp_toolkit_path(environ_cp)
-      set_computecpp_bitcode_target(environ_cp)
+    if use_computecpp:
+      set_computecpp_vars(environ_cp)
     else:
       set_trisycl_include_dir(environ_cp)
 
