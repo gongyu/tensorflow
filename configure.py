@@ -1349,21 +1349,30 @@ def set_sycl_extra_options(environ_cp):
       get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
   write_action_env_to_bazelrc('TF_USE_HALF_SYCL', use_half)
   if use_half == 0:
-    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1'.format(config))
+    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
 
   use_double = int(
       get_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True))
   write_action_env_to_bazelrc('TF_USE_DOUBLE_SYCL', use_double)
   if use_double == 0:
-    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1'.format(config))
+    write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
 
   # No need to ask for another question regarding LOCAL_MEM,
   # setting this environment variable to 0 or 1 can improve performances
   # depending on whether the device used has local memory.
   use_local_mem = environ_cp.get('TF_SYCL_USE_LOCAL_MEM', 'None')
   write_action_env_to_bazelrc('TF_SYCL_USE_LOCAL_MEM', use_local_mem)
-  prefix = '' if use_local_mem else 'NO_'
-  write_to_bazelrc('build:sycl --cxxopt=-D{}LOCAL_MEM'.format(config, prefix))
+  if use_local_mem is not 'None':
+    prefix = '' if int(use_local_mem) else 'NO_'
+    write_to_bazelrc('build:sycl --cxxopt=-D{}LOCAL_MEM'.format(prefix))
+
+  # No need to ask for another question regarding SERIAL_MEMOP,
+  # setting this environment variable to 1 fixes a compile_error exception
+  # on devices that do not support memory intrisics.
+  use_serial_memop = int(environ_cp.get('TF_SYCL_USE_SERIAL_MEMOP', '0'))
+  write_action_env_to_bazelrc('TF_SYCL_USE_SERIAL_MEMOP', use_serial_memop)
+  if not use_serial_memop:
+    write_to_bazelrc('build:sycl --cxxopt=-no-serial-memop')
 
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""

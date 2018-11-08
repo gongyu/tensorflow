@@ -29,6 +29,7 @@ _TF_SYCL_CROSS_TOOLCHAIN_NAME = "TF_SYCL_CROSS_TOOLCHAIN_NAME"
 _TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
 _TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
+_TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 
 _COMPUTECPP_MIN_VERSION = 102
 
@@ -244,6 +245,10 @@ def _get_sycldnn_substitutions(repository_ctx):
   no_local_mem = "ON" if use_local_mem == "0" else "OFF"
   cmake_options.append("-DSNN_EIGEN_LOCAL_MEM={}".format(local_mem))
   cmake_options.append("-DSNN_EIGEN_NO_LOCAL_MEM={}".format(no_local_mem))
+
+  use_serial_memop = repository_ctx.os.environ[_TF_SYCL_USE_SERIAL_MEMOP]
+  serial_memop = "ON" if use_serial_memop == "1" else "OFF"
+  cmake_options.append("-DSNN_COMPUTECPP_ENABLE_SERIAL_MEMOP={}".format(serial_memop))
 
   return {
     "%{SNN_EXPORTS}%" : ' '.join(exports),
