@@ -31,7 +31,7 @@ _TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 
-_COMPUTECPP_MIN_VERSION = 102
+_COMPUTECPP_MIN_VERSION = "1.0.2"
 
 def _enable_sycl(repository_ctx):
   if _TF_NEED_OPENCL_SYCL in repository_ctx.os.environ:
@@ -75,20 +75,22 @@ def find_cc(repository_ctx):
     fail("Cannot find C++ compiler, please correct your path.")
   return cc
 
-def prettify_version(ver):
-  str_ver = str(ver)
-  # Equivalent of zfill(3)
-  str_ver = '0' * (3 - len(str_ver)) + str_ver
-  return "CE {}.{}.{}".format(str_ver[0], str_ver[1], str_ver[2])
+def to_tuple(version):
+  ''' Converts a version with dot deparated values to a tuple of ints '''
+  return tuple([int(x) for x in version.split('.')])
 
 def check_computecpp_version(repository_ctx, computecpp_path):
-  computecpp_info_cmd = "{}/bin/computecpp_info".format(computecpp_path)
-  result = repository_ctx.execute([computecpp_info_cmd, "--dump-version"], quiet=True)
-  output = result.stdout
-  current_version = int(output[3] + output[5] + output[7])
-  if current_version < _COMPUTECPP_MIN_VERSION:
+  '''
+  Checks if the version of computecpp at computecpp_path is
+  more recent than _COMPUTECPP_MIN_VERSION
+  '''
+  computecpp_info_cmd = "{}/bin/computecpp_info --dump-version".format(computecpp_path)
+  result = repository_ctx.execute(computecpp_info_cmd.split(' '), quiet=True)
+  current_version = result.stdout.split(' ')[1].strip('\n')
+
+  if to_tuple(current_version) < to_tuple(_COMPUTECPP_MIN_VERSION):
     fail("Found ComputeCpp version {} but expected at least {}".format(
-          prettify_version(current_version), prettify_version(_COMPUTECPP_MIN_VERSION)))
+        current_version, _COMPUTECPP_MIN_VERSION))
 
 def find_computecpp_root(repository_ctx):
   """Find ComputeCpp compiler."""
