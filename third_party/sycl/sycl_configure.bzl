@@ -45,13 +45,13 @@ def _enable_compute_cpp(repository_ctx):
 def _crosscompile(repository_ctx):
   return _TF_SYCL_CROSS_TOOLCHAIN in repository_ctx.os.environ
 
-def auto_configure_fail(msg):
+def _auto_configure_fail(msg):
   """Output failure message when auto configuration fails."""
   red = "\033[0;31m"
   no_color = "\033[0m"
   fail("\n%sAuto-Configuration Error:%s %s\n" % (red, no_color, msg))
 
-def find_c(repository_ctx):
+def _find_c(repository_ctx):
   """Find host C compiler."""
   c_name = "gcc"
   if _HOST_C_COMPILER in repository_ctx.os.environ:
@@ -63,7 +63,7 @@ def find_c(repository_ctx):
     fail("Cannot find C compiler, please correct your path.")
   return c
 
-def find_cc(repository_ctx):
+def _find_cc(repository_ctx):
   """Find host C++ compiler."""
   cc_name = "g++"
   if _HOST_CXX_COMPILER in repository_ctx.os.environ:
@@ -75,11 +75,11 @@ def find_cc(repository_ctx):
     fail("Cannot find C++ compiler, please correct your path.")
   return cc
 
-def to_tuple(version):
+def _to_tuple(version):
   ''' Converts a version with dot deparated values to a tuple of ints '''
   return tuple([int(x) for x in version.split('.')])
 
-def check_computecpp_version(repository_ctx, computecpp_path):
+def _check_computecpp_version(repository_ctx, computecpp_path):
   '''
   Checks if the version of computecpp at computecpp_path is
   more recent than _COMPUTECPP_MIN_VERSION
@@ -88,21 +88,21 @@ def check_computecpp_version(repository_ctx, computecpp_path):
   result = repository_ctx.execute(computecpp_info_cmd.split(' '), quiet=True)
   current_version = result.stdout.split(' ')[1].strip('\n')
 
-  if to_tuple(current_version) < to_tuple(_COMPUTECPP_MIN_VERSION):
+  if _to_tuple(current_version) < _to_tuple(_COMPUTECPP_MIN_VERSION):
     fail("Found ComputeCpp version {} but expected at least {}".format(
         current_version, _COMPUTECPP_MIN_VERSION))
 
-def find_computecpp_root(repository_ctx):
+def _find_computecpp_root(repository_ctx):
   """Find ComputeCpp compiler."""
   computecpp_path = ""
   if _COMPUTECPP_TOOLKIT_PATH in repository_ctx.os.environ:
     computecpp_path = repository_ctx.os.environ[_COMPUTECPP_TOOLKIT_PATH].strip()
   if computecpp_path.startswith("/"):
-    check_computecpp_version(repository_ctx, computecpp_path)
+    _check_computecpp_version(repository_ctx, computecpp_path)
     return computecpp_path
   fail("Cannot find SYCL compiler, please correct your path")
 
-def find_trisycl_include_dir(repository_ctx):
+def _find_trisycl_include_dir(repository_ctx):
   """Find triSYCL include directory. """
   if _TRISYCL_INCLUDE_DIR in repository_ctx.os.environ:
     sycl_name = repository_ctx.os.environ[_TRISYCL_INCLUDE_DIR].strip()
@@ -110,7 +110,7 @@ def find_trisycl_include_dir(repository_ctx):
       return sycl_name
   fail( "Cannot find triSYCL include directory, please correct your path")
 
-def find_python_lib(repository_ctx):
+def _find_python_lib(repository_ctx):
   """Returns python path."""
   if _PYTHON_LIB_PATH in repository_ctx.os.environ:
     return repository_ctx.os.environ[_PYTHON_LIB_PATH].strip()
@@ -126,7 +126,7 @@ def _check_lib(repository_ctx, toolkit_path, lib):
   """
   lib_path = toolkit_path + "/" + lib
   if not repository_ctx.path(lib_path).exists:
-    auto_configure_fail("Cannot find %s" % lib_path)
+    _auto_configure_fail("Cannot find %s" % lib_path)
 
 def _check_dir(repository_ctx, directory):
   """Checks whether the directory exists and fail if it does not.
@@ -136,7 +136,7 @@ def _check_dir(repository_ctx, directory):
     directory: The directory to check the existence of.
   """
   if not repository_ctx.path(directory).exists:
-    auto_configure_fail("Cannot find dir: %s" % directory)
+    _auto_configure_fail("Cannot find dir: %s" % directory)
 
 def _symlink_dir(repository_ctx, src_dir, dest_dir):
   """Symlinks all the files in a directory.
@@ -212,7 +212,7 @@ def _get_sycldnn_substitutions(repository_ctx):
   exports = []
   cmake_options = []
   use_computecpp = _enable_compute_cpp(repository_ctx)
-  computecpp_root = find_computecpp_root(repository_ctx) if use_computecpp else ""
+  computecpp_root = _find_computecpp_root(repository_ctx) if use_computecpp else ""
   if _crosscompile(repository_ctx):
     gcc_toolchain_path = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN]
     gcc_toolchain_name = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN_NAME]
@@ -279,7 +279,7 @@ def _sycl_autoconf_impl(repository_ctx):
     _file(repository_ctx, "sycl:LICENSE.text")
 
     if _enable_compute_cpp(repository_ctx):
-      computecpp_root = find_computecpp_root(repository_ctx)
+      computecpp_root = _find_computecpp_root(repository_ctx)
       _check_dir(repository_ctx, computecpp_root)
 
       spir_type = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
@@ -296,13 +296,13 @@ def _sycl_autoconf_impl(repository_ctx):
       _symlink_dir(repository_ctx, computecpp_root + "/include", "sycl/include")
       _symlink_dir(repository_ctx, computecpp_root + "/bin", "sycl/bin")
     else:
-      trisycl_include_dir = find_trisycl_include_dir(repository_ctx)
+      trisycl_include_dir = _find_trisycl_include_dir(repository_ctx)
       _check_dir(repository_ctx, trisycl_include_dir)
 
       _tpl(repository_ctx, "crosstool:trisycl",
       {
-        "%{host_cxx_compiler}" : find_cc(repository_ctx),
-        "%{host_c_compiler}" : find_c(repository_ctx),
+        "%{host_cxx_compiler}" : _find_cc(repository_ctx),
+        "%{host_c_compiler}" : _find_c(repository_ctx),
         "%{trisycl_include_dir}" : trisycl_include_dir
       })
 
@@ -311,7 +311,7 @@ def _sycl_autoconf_impl(repository_ctx):
         "%{sycl_include_dir}" : trisycl_include_dir,
         "%{sycl_impl}" : "trisycl",
         "%{c++_std}" : "-std=c++1y",
-        "%{python_lib_path}" : find_python_lib(repository_ctx),
+        "%{python_lib_path}" : _find_python_lib(repository_ctx),
       })
 
       _symlink_dir(repository_ctx, trisycl_include_dir, "sycl/include")
