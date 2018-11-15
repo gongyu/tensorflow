@@ -237,6 +237,9 @@ def _get_sycldnn_substitutions(repository_ctx):
   cmake_options.append("-DCMAKE_EXE_LINKER_FLAGS=-Wl,--enable-new-dtags")
   cmake_options.append("-DCMAKE_CXX_FLAGS_RELEASE=-O3")
 
+  bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
+  cmake_options.append("-DCOMPUTECPP_BITCODE={}".format(bitcode_target))
+
   use_half = "ON" if repository_ctx.os.environ[_TF_USE_HALF_SYCL] != "0" else "OFF"
   cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
   use_double = "ON" if repository_ctx.os.environ[_TF_USE_DOUBLE_SYCL] != "0" else "OFF"
@@ -250,7 +253,7 @@ def _get_sycldnn_substitutions(repository_ctx):
 
   use_serial_memop = repository_ctx.os.environ[_TF_SYCL_USE_SERIAL_MEMOP]
   serial_memop = "ON" if use_serial_memop == "1" else "OFF"
-  cmake_options.append("-DSNN_COMPUTECPP_ENABLE_SERIAL_MEMOP={}".format(serial_memop))
+  cmake_options.append("-DSNN_COMPUTECPP_USE_SERIAL_MEMOP={}".format(serial_memop))
 
   return {
     "%{SNN_EXPORTS}%" : ' '.join(exports),
@@ -282,13 +285,13 @@ def _sycl_autoconf_impl(repository_ctx):
       computecpp_root = _find_computecpp_root(repository_ctx)
       _check_dir(repository_ctx, computecpp_root)
 
-      spir_type = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
+      bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
       _tpl(repository_ctx, "crosstool:CROSSTOOL",
       {
         "%{CROSS_COMPILER_PATH}%" : gcc_toolchain_path,
         "%{CROSS_TARGET}%" : gcc_toolchain_name,
         "%{COMPUTECPP_ROOT_DIR}%"  : computecpp_root,
-        "%{BITCODE_FORMAT}%" : spir_type
+        "%{BITCODE_FORMAT}%" : bitcode_target
       })
 
       _check_lib(repository_ctx, computecpp_root + "/lib", "libComputeCpp.so" )
