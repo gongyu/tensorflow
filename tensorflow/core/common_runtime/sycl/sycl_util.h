@@ -26,6 +26,10 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dma_helper.h"
 #include "tensorflow/core/framework/tensor.h"
 
+//TODO(codeplay): remove later
+#include <cstdlib>
+#include <thread>
+
 namespace tensorflow {
 
 inline void const* GetBase(const Tensor* src) { return DMAHelper::base(src); }
@@ -81,6 +85,13 @@ template <class SDStatus>
 inline Status get_sd_err_msg(const SDStatus& s) {
   return errors::Internal("Internal error from SYCL-DNN code " +
       std::to_string(static_cast<int>(s.status)));
+}
+
+//TODO(codeplay): remove later
+inline bool is_snn_enabled() {
+  static const char* use_snn_cstr = std::getenv("TF_SYCL_USE_SNN");
+  static bool use_snn = use_snn_cstr != nullptr && std::string(use_snn_cstr) == "1";
+  return use_snn;
 }
 
 inline const cl::sycl::id<3> get_max_work_item_tuple(const Eigen::SyclDevice& d) {

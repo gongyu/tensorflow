@@ -83,15 +83,22 @@ struct LaunchConv2DOp<SYCLDevice, T> {
           context->eigen_device<SYCLDevice>(),
           in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-      auto selector = sycldnn::conv2d::get_default_selector(
-          device.sycl_queue().get_device());
-      auto status = sd::launch<T, sd::conv_type::Forward>(
-          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
+      if (!is_snn_enabled()) {
+        SNN_SELECTOR sel;
+        launch_conv2d<T, ConvType::Forward>(context->eigen_device<SYCLDevice>(),
+                                          in_ptr, fil_ptr, params, out_ptr, sel);
       }
-      status.event.wait();
+      else {
+        auto selector = sycldnn::conv2d::get_default_selector(
+            device.sycl_queue().get_device());
+        auto status = sd::launch<T, sd::conv_type::Forward>(
+            in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+        if (status.status != sycldnn::StatusCode::OK) {
+          context->SetStatus(get_sd_err_msg(status));
+          return;
+        }
+        status.event.wait();
+      }
     }
   }
 };
@@ -151,15 +158,22 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
           context->eigen_device<SYCLDevice>(),
           in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-      auto selector = sycldnn::conv2d::get_default_selector(
-          device.sycl_queue().get_device());
-      auto status = sd::launch<T, sd::conv_type::InputBackprop>(
-          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
+      if (!is_snn_enabled()) {
+        SNN_SELECTOR sel;
+        launch_conv2d<T, ConvType::InputBackprop>(context->eigen_device<SYCLDevice>(),
+                                          in_ptr, fil_ptr, params, out_ptr, sel);
       }
-      status.event.wait();
+      else {
+        auto selector = sycldnn::conv2d::get_default_selector(
+            device.sycl_queue().get_device());
+        auto status = sd::launch<T, sd::conv_type::InputBackprop>(
+            in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+        if (status.status != sycldnn::StatusCode::OK) {
+          context->SetStatus(get_sd_err_msg(status));
+          return;
+        }
+        status.event.wait();
+      }
     }
   }
 };
@@ -219,18 +233,28 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
           context->eigen_device<SYCLDevice>(),
           in_ptr, fil_ptr, params, out_ptr, sel);
     } else {
-      auto selector = sycldnn::conv2d::get_default_selector(
-          device.sycl_queue().get_device());
-      auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
-          in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
+      if (!is_snn_enabled()) {
+        SNN_SELECTOR sel;
+        launch_conv2d<T, ConvType::FilterBackprop>(context->eigen_device<SYCLDevice>(),
+                                          in_ptr, fil_ptr, params, out_ptr, sel);
       }
-      status.event.wait();
+      else {
+        auto selector = sycldnn::conv2d::get_default_selector(
+            device.sycl_queue().get_device());
+        auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
+            in_ptr, fil_ptr, out_ptr, sd_params, *selector, backend);
+        if (status.status != sycldnn::StatusCode::OK) {
+          context->SetStatus(get_sd_err_msg(status));
+          return;
+        }
+        status.event.wait();
+      }
     }
   }
 };
+
 }  // namespace tensorflow
+
 #undef SNN_SELECTOR
+
 #endif  // TENSORFLOW_KERNELS_CONV_OPS_SYCL_H_
