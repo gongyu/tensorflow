@@ -1557,7 +1557,7 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }
@@ -1669,7 +1669,7 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }
@@ -1802,7 +1802,7 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }

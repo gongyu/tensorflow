@@ -399,7 +399,7 @@ class AvgPoolingOp<SYCLDevice, T> : public UnaryOp<T> {
         context->SetStatus(get_sd_err_msg(status));
         return;
       }
-      status.event.wait();
+      device.sycl_queue().wait_and_throw();
     }
   }
 
@@ -991,7 +991,7 @@ class AvgPoolingGradOp<SYCLDevice, T> : public OpKernel {
         context->SetStatus(get_sd_err_msg(status));
         return;
       }
-      status.event.wait();
+      device.sycl_queue().wait_and_throw();
     }
   }
 

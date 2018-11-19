@@ -97,7 +97,7 @@ struct LaunchConv2DOp<SYCLDevice, T> {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }
@@ -172,7 +172,7 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }
@@ -247,7 +247,7 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
           context->SetStatus(get_sd_err_msg(status));
           return;
         }
-        status.event.wait();
+        device.sycl_queue().wait_and_throw();
       }
     }
   }
