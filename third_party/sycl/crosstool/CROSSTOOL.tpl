@@ -58,8 +58,6 @@ toolchain {
 
   cxx_flag: "-std=c++11"
   cxx_flag: "-fsycl-ih-last"
-  cxx_flag: "-mllvm"
-  cxx_flag: "-inline-threshold=10000"
   cxx_flag: "-sycl-driver"
   cxx_flag: "-cl-denorms-are-zero"
   cxx_flag: "-cl-fp32-correctly-rounded-divide-sqrt"
@@ -113,6 +111,8 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
+    compiler_flag: "-mllvm"
+    compiler_flag: "-inline-threshold=10000"
     linker_flag: "-Wl,--gc-sections"
   }
 
@@ -161,8 +161,6 @@ toolchain {
 
   cxx_flag: "-std=c++11"
   cxx_flag: "-fsycl-ih-last"
-  cxx_flag: "-mllvm"
-  cxx_flag: "-inline-threshold=10000"
   cxx_flag: "-sycl-driver"
   cxx_flag: "-cl-denorms-are-zero"
   cxx_flag: "-cl-fp32-correctly-rounded-divide-sqrt"
@@ -220,6 +218,8 @@ toolchain {
     compiler_flag: "-g0"
     compiler_flag: "-O2"
     compiler_flag: "-DNDEBUG"
+    compiler_flag: "-mllvm"
+    compiler_flag: "-inline-threshold=10000"
     linker_flag: "-Wl,--gc-sections"
   }
 
