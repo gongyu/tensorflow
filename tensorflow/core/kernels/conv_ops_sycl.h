@@ -50,10 +50,6 @@ struct SNNSelector final : public conv2d::Selector {
     }
     return conv2d::Algorithm::Direct;
 #else
-    if (params.window_rows == 1 && params.window_cols == 1 &&
-        params.stride_rows == 1 && params.stride_cols == 1) {
-      return conv2d::Algorithm::Direct;
-    }
     if ((params.stride_rows == 1 && params.stride_cols == 1) &&
         (params.window_rows <= 3 && params.window_cols <= 3)) {
       return conv2d::Algorithm::Winograd;
@@ -122,26 +118,32 @@ struct LaunchConv2DOp<SYCLDevice, T> {
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
-      launch_conv2d_nchw<T, ConvType::Forward>(
-          context->eigen_device<SYCLDevice>(),
-          in_ptr, fil_ptr, params, out_ptr, sel);
+      launch_conv2d_nchw<T, ConvType::Forward>(device, in_ptr, fil_ptr,
+                                               params, out_ptr, sel);
     } else {
       if (!is_snn_enabled()) {
         SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::Forward>(context->eigen_device<SYCLDevice>(),
-                                          in_ptr, fil_ptr, params, out_ptr, sel);
-      }
-      else {
-        snn::SNNSelector selector;
-        auto status = sd::launch<T, sd::conv_type::Forward>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
+        launch_conv2d<T, ConvType::Forward>(device, in_ptr, fil_ptr,
+                                            params, out_ptr, sel);
+      } else {
+        if (sd_params.window_rows == 1 && sd_params.window_cols == 1 &&
+            sd_params.stride_rows == 1 && sd_params.stride_cols == 1) {
+          auto conv_width = sd_params.batch * sd_params.out_rows * sd_params.out_cols;
+          sycl_conv::launch_matmul<false, false>(device, in_ptr, fil_ptr, out_ptr,
+                                                 static_cast<T>(0), conv_width,
+                                                 sd_params.channels, sd_params.features);
+        } else {
+          snn::SNNSelector selector;
+          auto status = sd::launch<T, sd::conv_type::Forward>(
+              in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+          if (status.status != sycldnn::StatusCode::OK) {
+            context->SetStatus(get_sd_err_msg(status));
+            return;
+          }
         }
-        device.sycl_queue().wait_and_throw();
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 };
 
@@ -196,26 +198,32 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
-      launch_conv2d_nchw<T, ConvType::InputBackprop>(
-          context->eigen_device<SYCLDevice>(),
-          in_ptr, fil_ptr, params, out_ptr, sel);
+      launch_conv2d_nchw<T, ConvType::InputBackprop>(device, in_ptr, fil_ptr,
+                                                     params, out_ptr, sel);
     } else {
       if (!is_snn_enabled()) {
         SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::InputBackprop>(context->eigen_device<SYCLDevice>(),
-                                          in_ptr, fil_ptr, params, out_ptr, sel);
-      }
-      else {
-        snn::SNNSelector selector;
-        auto status = sd::launch<T, sd::conv_type::InputBackprop>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
+        launch_conv2d<T, ConvType::InputBackprop>(device, in_ptr, fil_ptr,
+                                                  params, out_ptr, sel);
+      } else {
+        if (sd_params.window_rows == 1 && sd_params.window_cols == 1 &&
+            sd_params.stride_rows == 1 && sd_params.stride_cols == 1) {
+          auto conv_width = sd_params.batch * sd_params.out_rows * sd_params.out_cols;
+          sycl_conv::launch_matmul<false, true>(device, in_ptr, fil_ptr, out_ptr,
+                                                static_cast<T>(0), conv_width,
+                                                sd_params.features, sd_params.channels);
+        } else {
+          snn::SNNSelector selector;
+          auto status = sd::launch<T, sd::conv_type::InputBackprop>(
+              in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+          if (status.status != sycldnn::StatusCode::OK) {
+            context->SetStatus(get_sd_err_msg(status));
+            return;
+          }
         }
-        device.sycl_queue().wait_and_throw();
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 };
 
@@ -270,26 +278,32 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
-      launch_conv2d_nchw<T, ConvType::FilterBackprop>(
-          context->eigen_device<SYCLDevice>(),
-          in_ptr, fil_ptr, params, out_ptr, sel);
+      launch_conv2d_nchw<T, ConvType::FilterBackprop>(device, in_ptr, fil_ptr,
+                                                      params, out_ptr, sel);
     } else {
       if (!is_snn_enabled()) {
         SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::FilterBackprop>(context->eigen_device<SYCLDevice>(),
-                                          in_ptr, fil_ptr, params, out_ptr, sel);
-      }
-      else {
-        snn::SNNSelector selector;
-        auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
+        launch_conv2d<T, ConvType::FilterBackprop>(device, in_ptr, fil_ptr,
+                                                   params, out_ptr, sel);
+      } else {
+        if (sd_params.window_rows == 1 && sd_params.window_cols == 1 &&
+            sd_params.stride_rows == 1 && sd_params.stride_cols == 1) {
+          auto conv_width = sd_params.batch * sd_params.out_rows * sd_params.out_cols;
+          sycl_conv::launch_matmul<true, false>(device, in_ptr, fil_ptr, out_ptr,
+                                                 static_cast<T>(0), sd_params.channels,
+                                                 conv_width, sd_params.features);
+        } else {
+          snn::SNNSelector selector;
+          auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
+              in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+          if (status.status != sycldnn::StatusCode::OK) {
+            context->SetStatus(get_sd_err_msg(status));
+            return;
+          }
         }
-        device.sycl_queue().wait_and_throw();
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 };
 
