@@ -43,10 +43,11 @@ genrule(
     # toolchains are both building SYCL-DNN in parallel.
     # An empty archive is enough for the host.
     cmd = "cd external/sycl_dnn_archive && " +
-          "rm -rf build_`echo $(TARGET_CPU)` && mkdir $$_ && cd $$_ && " +
+          "mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ && " +
           "if [[ \"$@\" =~ \"host\" ]]; then " +
           "  ar rcs libsycldnn_static.a; " +
           "else " +
+          "  rm -rf * && " +
           "  %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log && " +
           "  make sycl_dnn_static > make_log; " +
           "fi && " +
