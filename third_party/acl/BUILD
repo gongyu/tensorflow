@@ -1,6 +1,4 @@
-licenses(["notice"]) # MIT License
-
-exports_files(["LICENSE"])
+licenses(["notice"])  # Apache 2.0
 
 config_setting(
     name = "using_acl",

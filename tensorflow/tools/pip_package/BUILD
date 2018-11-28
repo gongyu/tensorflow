@@ -166,8 +166,6 @@ filegroup(
         "@org_python_pypi_backports_weakref//:LICENSE",
     ] + if_mkl([
         "//third_party/mkl:LICENSE",
-    ]) + if_acl([
-        "//third_party/acl:LICENSE",
     ]) + tf_additional_license_deps(),
 )
 

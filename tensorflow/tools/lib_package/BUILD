@@ -144,7 +144,6 @@ genrule(
     ] + if_mkl([
         "//third_party/mkl:LICENSE",
     ]) + if_acl([
-        "//third_party/acl:LICENSE",
         "@acl//:LICENSE",
     ]),
     outs = ["include/tensorflow/c/LICENSE"],
@@ -185,7 +184,6 @@ genrule(
     ] + if_mkl([
         "//third_party/mkl:LICENSE",
     ]) + if_acl([
-        "//third_party/acl:LICENSE",
         "@acl//:LICENSE",
     ]),
     outs = ["include/tensorflow/jni/LICENSE"],
