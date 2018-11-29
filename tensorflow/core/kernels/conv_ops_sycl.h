@@ -51,7 +51,9 @@ struct SNNSelector final : public conv2d::Selector {
     return conv2d::Algorithm::Direct;
 #else
     if ((params.stride_rows == 1 && params.stride_cols == 1) &&
-        (params.window_rows <= 3 && params.window_cols <= 3)) {
+        ((params.window_rows == 1 && params.window_cols == 3) ||
+         (params.window_rows == 3 && params.window_cols == 1) ||
+         (params.window_rows == 3 && params.window_cols == 3))) {
       return conv2d::Algorithm::Winograd;
     }
     return conv2d::Algorithm::Im2col;
