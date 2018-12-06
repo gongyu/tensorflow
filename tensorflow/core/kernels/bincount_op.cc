@@ -156,8 +156,7 @@ struct BincountFunctor<SYCLDevice, T> {
       output.device(d) = (result_mat * bcast_weights).sum(sum_dim);
     }
     else {
-      auto bcast_weights = index_matrix.constant(1);
-      output.device(d) = (result_mat * bcast_weights).sum(sum_dim);
+      output.device(d) = result_mat.sum(sum_dim);
     }
 
     return Status::OK();
