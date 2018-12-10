@@ -90,7 +90,7 @@ inline Status get_sd_err_msg(const SDStatus& s) {
 //TODO(codeplay): remove later
 inline bool is_snn_enabled() {
   static const char* use_snn_cstr = std::getenv("TF_SYCL_USE_SNN");
-  static bool use_snn = use_snn_cstr != nullptr && std::string(use_snn_cstr) == "1";
+  static bool use_snn = use_snn_cstr == nullptr || std::string(use_snn_cstr) != "0";
   return use_snn;
 }
 
