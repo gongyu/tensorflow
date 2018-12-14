@@ -1533,8 +1533,8 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(
                                 0, params.forward_output_shape(), &output));
 
-    // This is not an error in TensorFlow, the context expect an empty output
-    // in this case.
+    // This would be an error in SYCL-DNN but not in TensorFlow,
+    // the context expect an empty output in this case.
     if (sd_params.batch == 0)
       return;
 
@@ -1542,24 +1542,29 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     sycldnn::backend::EigenBackend backend(device);
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (propagate_nans_) {
-      LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
-          context, tensor_in, params, output);
-    } else {
-      if (!is_snn_enabled()) {
-        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(context, tensor_in,
-                                                          params, output);
+    if (!is_snn_enabled()) {
+      if (propagate_nans_) {
+        LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
+            context, tensor_in, params, output);
+      } else {
+        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(
+            context, tensor_in, params, output);
       }
-      else {
-        auto status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+    } else {
+      sycldnn::SNNStatus status;
+      if (propagate_nans_) {
+        status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
             sd_params, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
-        device.sycl_queue().wait_and_throw();
+      } else {
+        status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+            sd_params, backend);
+      }
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 
  private:
@@ -1654,24 +1659,29 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
     sycldnn::backend::EigenBackend backend(device);
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (propagate_nans_) {
-      LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
-          context, tensor_in, params, output);
-    } else {
-      if (!is_snn_enabled()) {
-        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(context, tensor_in,
-                                                          params, output);
+    if (!is_snn_enabled()) {
+      if (propagate_nans_) {
+        LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
+            context, tensor_in, params, output);
+      } else {
+        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(
+            context, tensor_in, params, output);
       }
-      else {
-        auto status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+    } else {
+      sycldnn::SNNStatus status;
+      if (propagate_nans_) {
+        status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
             sd_params, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
-        device.sycl_queue().wait_and_throw();
+      } else {
+        status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+            sd_params, backend);
+      }
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 
  private:
@@ -1787,24 +1797,29 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
     auto out_data_ptr = tensor_out.template flat<T>().data();
     auto backprop_ptr = out_backprop.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (propagate_nans_) {
-      LaunchMaxPoolingGradOpSYCL<T, EqualWithNans<T>>::launch(
-          context, tensor_in, tensor_out, out_backprop, params, output);
-    } else {
-      if (!is_snn_enabled()) {
+    if (!is_snn_enabled()) {
+      if (propagate_nans_) {
+        LaunchMaxPoolingGradOpSYCL<T, EqualWithNans<T>>::launch(
+            context, tensor_in, tensor_out, out_backprop, params, output);
+      } else {
         LaunchMaxPoolingGradOpSYCL<T, Equal<T>>::launch(
-          context, tensor_in, tensor_out, out_backprop, params, output);
+            context, tensor_in, tensor_out, out_backprop, params, output);
       }
-      else {
-        auto status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
+    } else {
+      sycldnn::SNNStatus status;
+      if (propagate_nans_) {
+        status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(in_data_ptr,
             out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
-        device.sycl_queue().wait_and_throw();
+      } else {
+        status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
+            out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+      }
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
+    device.sycl_queue().wait_and_throw();
   }
 
  private:
@@ -1814,6 +1829,7 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
   TensorFormat data_format_;
   bool propagate_nans_;
 };
+
 template <typename T>
 class MaxPoolingGradGradOp<SYCLDevice, T> : public OpKernel {
  public:
@@ -1940,7 +1956,6 @@ class MaxPoolingGradGradOp<SYCLDevice, T> : public OpKernel {
                               .TypeConstraint<T>("T"),            \
                           MaxPoolingV2Op<SYCLDevice, T>);         \
   REGISTER_MAX_POOL_KERNELS_SYCL(SYCL, T)
-//TODO(codeplay): Register MaxPoolWithArgmax and MaxPoolGradGradWithArgmax
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL_MAX_POOL_KERNELS);
 #undef REGISTER_SYCL_MAX_POOL_KERNELS
 #undef REGISTER_MAX_POOL_KERNELS_SYCL

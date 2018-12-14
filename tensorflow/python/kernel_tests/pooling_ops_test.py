@@ -1501,10 +1501,8 @@ class PoolingTest(test.TestCase):
     self._testMaxPoolGradDirect1_1()
     self._testMaxPoolGradDirect1_2()
     self._testMaxPoolGradDirect1_3()
-    #TODO(codeplay): Maxpooling doesn't handle nans yet
-    if "sycl" not in test_util.gpu_device_name().lower():
-      self._testMaxPoolGradDirectWithNans2_1()
-      self._testMaxPoolGradDirectWithNans2_2()
+    self._testMaxPoolGradDirectWithNans2_1()
+    self._testMaxPoolGradDirectWithNans2_2()
 
   def _testMaxPoolGradGradValidPadding1_1(self, data_format, use_gpu):
     for pool_func in [gen_nn_ops.max_pool_v2, nn_ops.max_pool]:
