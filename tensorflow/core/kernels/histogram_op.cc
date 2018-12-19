@@ -135,11 +135,7 @@ struct HistogramFixedWidthFunctor<SYCLDevice, T, Tout> {
           .cwiseMin(nbins - 1);
     auto index_to_bin_2d = index_to_bin.reshape(values_size_by_one)
                                        .broadcast(one_by_nbins);
-    // The map below must live until the kernel is executed
-    TTypes<int32, 2>::Tensor values_size_by_nbins_map(nullptr,
-        values_size, nbins);
-    auto col_indices =
-      values_size_by_nbins_map.generate(ColIndicesGenerator<int32>());
+    auto col_indices = index_to_bin_2d.generate(ColIndicesGenerator<int32>());
 
     out.device(d) = (index_to_bin_2d == col_indices)
                       .template cast<Tout>().sum(sum_dim);
