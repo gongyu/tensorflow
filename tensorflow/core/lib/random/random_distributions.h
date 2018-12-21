@@ -628,7 +628,7 @@ void BoxMullerFloat(uint32 x0, uint32 x1, float* f0, float* f1) {
   if (u1 < epsilon) {
     u1 = epsilon;
   }
-  const float v1 = 2.0f * M_PI * Uint32ToFloat(x1);
+  const float v1 = 2.0f * float(M_PI) * Uint32ToFloat(x1);
   const float u2 = Eigen::numext::sqrt(-2.0f * Eigen::numext::log(u1));
 #if defined(TENSORFLOW_USE_SYCL) || !defined(__linux__)
   *f0 = Eigen::numext::sin(v1);
