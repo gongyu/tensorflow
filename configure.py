@@ -1345,8 +1345,10 @@ def set_trisycl_include_dir(environ_cp):
 
 def set_sycl_extra_options(environ_cp):
   """Set which data types are enabled for the SYCL configuration."""
-  use_half = int(
-      get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
+  #TODO(codeplay): Add support for half
+  #use_half = int(
+  #    get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
+  use_half = 0
   write_action_env_to_bazelrc('TF_USE_HALF_SYCL', use_half)
   if use_half == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
