@@ -533,7 +533,6 @@ struct LaunchDepthwiseConvOp<SYCLDevice, T> {
         ctx->SetStatus(get_sd_err_msg(status));
         return;
       }
-      device.sycl_queue().wait_and_throw();
     }
   }
 };
@@ -580,7 +579,6 @@ struct LaunchDepthwiseConvBackpropInputOp<SYCLDevice, T> {
         ctx->SetStatus(get_sd_err_msg(status));
         return;
       }
-      device.sycl_queue().wait_and_throw();
     }
   }
 };
@@ -627,7 +625,6 @@ struct LaunchDepthwiseConvBackpropFilterOp<SYCLDevice, T> {
         ctx->SetStatus(get_sd_err_msg(status));
         return;
       }
-      device.sycl_queue().wait_and_throw();
     }
   }
 };

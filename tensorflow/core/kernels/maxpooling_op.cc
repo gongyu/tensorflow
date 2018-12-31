@@ -1564,7 +1564,6 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 
  private:
@@ -1681,7 +1680,6 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 
  private:
@@ -1819,7 +1817,6 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 
  private:

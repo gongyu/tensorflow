@@ -141,7 +141,6 @@ struct LaunchConv2DOp<SYCLDevice, T> {
         }
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 };
 
@@ -213,7 +212,6 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
         }
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 };
 
@@ -285,7 +283,6 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
         }
       }
     }
-    device.sycl_queue().wait_and_throw();
   }
 };
 
