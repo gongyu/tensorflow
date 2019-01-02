@@ -114,6 +114,7 @@ toolchain {
     compiler_flag: "-mllvm"
     compiler_flag: "-inline-threshold=10000"
     linker_flag: "-Wl,--gc-sections"
+    linker_flag: "-Wl,--strip-all"
   }
 
   linking_mode_flags { mode: DYNAMIC }
@@ -221,6 +222,7 @@ toolchain {
     compiler_flag: "-mllvm"
     compiler_flag: "-inline-threshold=10000"
     linker_flag: "-Wl,--gc-sections"
+    linker_flag: "-Wl,--strip-all"
   }
 
   linking_mode_flags { mode: DYNAMIC }
