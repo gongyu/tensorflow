@@ -113,6 +113,8 @@ toolchain {
     compiler_flag: "-DNDEBUG"
     compiler_flag: "-mllvm"
     compiler_flag: "-inline-threshold=10000"
+    cxx_flag: "-Xsycl-device"
+    cxx_flag: "-O3"
     linker_flag: "-Wl,--gc-sections"
     linker_flag: "-Wl,--strip-all"
   }
@@ -221,6 +223,8 @@ toolchain {
     compiler_flag: "-DNDEBUG"
     compiler_flag: "-mllvm"
     compiler_flag: "-inline-threshold=10000"
+    cxx_flag: "-Xsycl-device"
+    cxx_flag: "-O3"
     linker_flag: "-Wl,--gc-sections"
     linker_flag: "-Wl,--strip-all"
   }
