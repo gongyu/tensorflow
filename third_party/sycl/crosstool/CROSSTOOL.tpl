@@ -104,6 +104,9 @@ toolchain {
   compilation_mode_flags {
     mode: DBG
     compiler_flag: "-g"
+    compiler_flag: "-O0"
+    compiler_flag: "-DDEBUG"
+    compiler_flag: "-DEIGEN_EXCEPTIONS"
   }
 
   compilation_mode_flags {
@@ -212,6 +215,9 @@ toolchain {
   compilation_mode_flags {
     mode: DBG
     compiler_flag: "-g"
+    compiler_flag: "-O0"
+    compiler_flag: "-DDEBUG"
+    compiler_flag: "-DEIGEN_EXCEPTIONS"
     # Seems to be needed for ARM only
     compiler_flag: "-mcmodel=large"
   }
