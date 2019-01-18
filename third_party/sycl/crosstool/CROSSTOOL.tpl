@@ -106,6 +106,7 @@ toolchain {
     compiler_flag: "-g"
     compiler_flag: "-O0"
     compiler_flag: "-DDEBUG"
+    compiler_flag: "-D_GLIBCXX_DEBUG"
     compiler_flag: "-DEIGEN_EXCEPTIONS"
   }
 
@@ -217,6 +218,7 @@ toolchain {
     compiler_flag: "-g"
     compiler_flag: "-O0"
     compiler_flag: "-DDEBUG"
+    compiler_flag: "-D_GLIBCXX_DEBUG"
     compiler_flag: "-DEIGEN_EXCEPTIONS"
     # Seems to be needed for ARM only
     compiler_flag: "-mcmodel=large"
