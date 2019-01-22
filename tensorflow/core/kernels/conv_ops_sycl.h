@@ -26,7 +26,7 @@ namespace tensorflow {
 
 namespace snn {
 namespace conv2d = sycldnn::conv2d;
-struct SNNSelector final : public conv2d::Selector {
+struct SNNSelectorGen final : public conv2d::Selector {
   conv2d::Algorithm select(const conv2d::Conv2DParams& params) override {
 #ifdef ARM_NON_MOBILE
     if (params.window_rows == params.window_cols && params.stride_rows == params.stride_cols) {
@@ -64,7 +64,31 @@ struct SNNSelector final : public conv2d::Selector {
 #endif
   }
 
-  const char* name() const override { return "SNNSelector"; }
+  const char* name() const override { return "SNNSelectorGen"; }
+};
+
+// FilterBackprop is not supported with tiled convolution so make sure not to select that here
+struct SNNSelectorFilterBackprop final : public conv2d::Selector {
+  conv2d::Algorithm select(const conv2d::Conv2DParams& params) override {
+#ifdef ARM_NON_MOBILE
+    if (params.window_rows == params.window_cols && params.stride_rows == params.stride_cols) {
+      if (params.window_rows == 3 && params.stride_rows == 1) {
+        if (params.channels < 10) {
+          return conv2d::Algorithm::Direct;
+        } else if (params.in_rows > 100) {
+          return conv2d::Algorithm::Winograd;
+        } else if (params.in_rows > 50) {
+          return conv2d::Algorithm::Im2col;
+        }
+      }
+    }
+    return conv2d::Algorithm::Direct;
+#else
+    return SNNSelectorGen().select(params);
+#endif
+  }
+
+  const char* name() const override { return "SNNSelectorFilterBackprop"; }
 };
 }  // namespace snn
 
@@ -132,7 +156,7 @@ struct LaunchConv2DOp<SYCLDevice, T> {
         launch_conv2d<T, ConvType::Forward>(device, in_ptr, fil_ptr,
                                             params, out_ptr, sel);
       } else {
-        snn::SNNSelector selector;
+        snn::SNNSelectorGen selector;
         auto status = sd::launch<T, sd::conv_type::Forward>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
@@ -203,7 +227,7 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
         launch_conv2d<T, ConvType::InputBackprop>(device, in_ptr, fil_ptr,
                                                   params, out_ptr, sel);
       } else {
-        snn::SNNSelector selector;
+        snn::SNNSelectorGen selector;
         auto status = sd::launch<T, sd::conv_type::InputBackprop>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
@@ -274,7 +298,7 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
         launch_conv2d<T, ConvType::FilterBackprop>(device, in_ptr, fil_ptr,
                                                    params, out_ptr, sel);
       } else {
-        snn::SNNSelector selector;
+        snn::SNNSelectorFilterBackprop selector;
         auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
