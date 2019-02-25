@@ -70,7 +70,11 @@ struct SyclCastFunctor<true, O, I> {
   inline void operator()(const Eigen::SyclDevice& d,
                          typename TTypes<O>::Flat o,
                          typename TTypes<I>::ConstFlat i) {
-    o.device(d) = i.template cast<O>();
+    // If either the output or the input is empty, it will have no associated buffer
+    // and this will fail
+    if (o.size() > 0) {
+      o.device(d) = i.template cast<O>();
+    }
   }
 };
 
