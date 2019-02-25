@@ -60,7 +60,9 @@ DEFINE_SETZERO_CPU(Variant);
 template <typename T>
 void SetZeroFunctor<Eigen::SyclDevice, T>::operator()(
     const Eigen::SyclDevice& d, typename TTypes<T>::Flat out) {
-  To32Bit(out).device(d) = To32Bit(out).constant(T(0));
+  if (out.size() > 0) {
+    To32Bit(out).device(d) = To32Bit(out).constant(T(0));
+  }
 }
 
 #define DEFINE_SETZERO_SYCL(T) \
@@ -104,7 +106,9 @@ DEFINE_SETONE_CPU(complex128);
 template <typename T>
 void SetOneFunctor<Eigen::SyclDevice, T>::operator()(
     const Eigen::SyclDevice& d, typename TTypes<T>::Flat out) {
-  To32Bit(out).device(d) = To32Bit(out).constant(T(1));
+  if (out.size() > 0) {
+    To32Bit(out).device(d) = To32Bit(out).constant(T(1));
+  }
 }
 
 #define DEFINE_SETONE_SYCL(T) \
@@ -143,6 +147,9 @@ template <typename T>
 struct FillFunctor<Eigen::SyclDevice, T> {
   void operator()(const Eigen::SyclDevice& d, typename TTypes<T>::Flat out,
                   typename TTypes<T>::ConstScalar in) {
+    if (out.size() == 0) {
+      return;
+    }
 #if !defined(EIGEN_HAS_INDEX_LIST)
     Eigen::array<int, 1> rank1{1};
 #else
