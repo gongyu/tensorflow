@@ -302,20 +302,25 @@ struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, B2S> {
     return Status::OK();
   }
 };
+
+// Instantiate SYCL.
+#define INSTANTIATE_SYCL(NUM_BLOCK_DIMS, T)                                  \
+  template struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, false>; \
+  template struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, true>;  \
+
+#define INSTANTIATE_SYCL_FOR_T(T) \
+  TF_SPACETOBATCH_FOR_EACH_NUM_BLOCK_DIMS(INSTANTIATE_SYCL, T)
+
+TF_CALL_INTEGRAL_TYPES(INSTANTIATE_SYCL_FOR_T)
+TF_CALL_SYCL_NUMBER_TYPES(INSTANTIATE_SYCL_FOR_T)
+#undef INSTANTIATE_SYCL_FOR_T
+#undef INSTANTIATE_SYCL
 #endif  // TENSORFLOW_USE_SYCL
 
 // Instantiate.
-#ifdef TENSORFLOW_USE_SYCL
-#define INSTANTIATE(NUM_BLOCK_DIMS, T)                                       \
-  template struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, false>; \
-  template struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, true>;  \
-  template struct SpaceToBatchFunctor<CPUDevice, T, NUM_BLOCK_DIMS, false>;  \
-  template struct SpaceToBatchFunctor<CPUDevice, T, NUM_BLOCK_DIMS, true>;
-#else
 #define INSTANTIATE(NUM_BLOCK_DIMS, T)                                      \
   template struct SpaceToBatchFunctor<CPUDevice, T, NUM_BLOCK_DIMS, false>; \
   template struct SpaceToBatchFunctor<CPUDevice, T, NUM_BLOCK_DIMS, true>;
-#endif
   /**/
 
 #define INSTANTIATE_FOR_T(T) \

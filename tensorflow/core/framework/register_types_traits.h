@@ -98,7 +98,7 @@ struct proxy_type {
   TF_CALL_double(m) TF_CALL_float(m) TF_CALL_half(m) TF_CALL_int32(m)
 #ifdef TENSORFLOW_USE_SYCL
 #define TF_CALL_SYCL_PROXY_TYPES(m) \
-  TF_CALL_double(m) TF_CALL_float(m) TF_CALL_int32(m)
+  TF_CALL_SYCL_double(m) TF_CALL_float(m) TF_CALL_SYCL_half(m) TF_CALL_int32(m)
 #endif  // TENSORFLOW_USE_SYCL
 }  // namespace tensorflow
 
