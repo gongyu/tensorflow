@@ -90,6 +90,26 @@ struct SNNSelectorFilterBackprop final : public conv2d::Selector {
 
   const char* name() const override { return "SNNSelectorFilterBackprop"; }
 };
+
+inline conv2d::Conv2DParams sycl_to_sd_params(const SYCLConv2DParams& params) {
+  conv2d::Conv2DParams sd_params;
+  sd_params.channels = params.channels_;
+  sd_params.features = params.features_;
+  sd_params.batch = params.batch_;
+  sd_params.in_rows = params.in_rows_;
+  sd_params.in_cols = params.in_cols_;
+  sd_params.window_rows = params.window_rows_;
+  sd_params.window_cols = params.window_cols_;
+  sd_params.stride_rows = params.stride_rows_;
+  sd_params.stride_cols = params.stride_cols_;
+  sd_params.out_rows = params.out_rows_;
+  sd_params.out_cols = params.out_cols_;
+  sd_params.pad_rows = params.pad_rows_;
+  sd_params.pad_cols = params.pad_cols_;
+  sd_params.dilation_rows = params.dilation_rows_;
+  sd_params.dilation_cols = params.dilation_cols_;
+  return sd_params;
+}
 }  // namespace snn
 
 typedef Eigen::SyclDevice SYCLDevice;
@@ -136,9 +156,7 @@ struct LaunchConv2DOp<SYCLDevice, T> {
 
     // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
     namespace sd = sycldnn::conv2d;
-    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
-                  "SYCLConv2DParams shouldn't be used anymore");
-    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
     sycldnn::backend::EigenBackend backend(device);
 
@@ -207,9 +225,7 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
 
     // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
     namespace sd = sycldnn::conv2d;
-    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
-                  "SYCLConv2DParams shouldn't be used anymore");
-    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
     sycldnn::backend::EigenBackend backend(device);
 
@@ -278,9 +294,7 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
 
     // TODO: Remove the SYCLConv2DParams struct and always use the sycldnn one instead.
     namespace sd = sycldnn::conv2d;
-    static_assert(sizeof(SYCLConv2DParams) == sizeof(sd::Conv2DParams),
-                  "SYCLConv2DParams shouldn't be used anymore");
-    auto sd_params = *reinterpret_cast<sd::Conv2DParams*>(&params);
+    auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
     sycldnn::backend::EigenBackend backend(device);
 
