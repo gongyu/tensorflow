@@ -107,12 +107,23 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "sycl_dnn_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/496e2890f2bf8c5f7286b03459b283ae9f7d5ba8.tar.gz",
-          "https://github.com/codeplaysoftware/SYCL-DNN/archive/496e2890f2bf8c5f7286b03459b283ae9f7d5ba8.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/49e25ed18e6c4664fed280645f1ce51d2d877b7e.tar.gz",
+          "https://github.com/codeplaysoftware/SYCL-DNN/archive/49e25ed18e6c4664fed280645f1ce51d2d877b7e.tar.gz",
       ],
-      sha256 = "838c0eba9cd803483d2f689af2a08f46828a8320f8eb4996a66c2e4c8e823bdd",
-      strip_prefix = "SYCL-DNN-496e2890f2bf8c5f7286b03459b283ae9f7d5ba8",
+      sha256 = "7caa8428bef6b77bbacbad80111b645372020b2386cf78429958abc98626e362",
+      strip_prefix = "SYCL-DNN-49e25ed18e6c4664fed280645f1ce51d2d877b7e",
       build_file = clean_dep("//third_party/sycl:sycl_dnn.BUILD"),
+  )
+
+  tf_http_archive(
+      name = "sycl_blas_archive",
+      urls = [
+          "https://mirror.bazel.build/github.com/codeplaysoftware/sycl-blas/archive/3641652e350bbcf0e1ee5434c2d2951fd3ea4efa.tar.gz",
+          "https://github.com/codeplaysoftware/sycl-blas/archive/3641652e350bbcf0e1ee5434c2d2951fd3ea4efa.tar.gz",
+      ],
+      sha256 = "97c9862c4e8b4d98bb3fe036d294409bcb244486c024060630020e0a972a91ce",
+      strip_prefix = "sycl-blas-3641652e350bbcf0e1ee5434c2d2951fd3ea4efa",
+      build_file = clean_dep("//third_party/sycl:sycl_blas.BUILD"),
   )
 
   tf_http_archive(

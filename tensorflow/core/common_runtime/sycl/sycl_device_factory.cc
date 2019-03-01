@@ -24,7 +24,8 @@ namespace tensorflow {
 
 class SYCLDeviceFactory : public DeviceFactory {
  public:
-  Status CreateDevices(const SessionOptions &options, const string &name_prefix,
+  Status CreateDevices(const SessionOptions &options,
+                       const string &name_prefix,
                        std::vector<Device *> *devices) override {
     auto syclInterface = GSYCLInterface::instance();
 
@@ -39,7 +40,8 @@ class SYCLDeviceFactory : public DeviceFactory {
       devices->push_back(new SYCLDevice(
           options, name, Bytes(256 << 20), DeviceLocality(),
           syclInterface->GetShortDeviceDescription(i),
-          syclInterface->GetSYCLAllocator(i), syclInterface->GetCPUAllocator(i),
+          syclInterface->GetSYCLAllocator(i),
+          syclInterface->GetCPUAllocator(i),
           syclInterface->GetSYCLContext(i)));
     }
 

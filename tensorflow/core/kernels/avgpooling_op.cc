@@ -42,11 +42,10 @@ limitations under the License.
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
-#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#include "tensorflow/core/kernels/sycl_dnn_utils.h"
 
-#include "sycldnn/pooling/launch.h"
 #include "sycldnn/pooling/operators.h"
-#include "sycldnn/backend/eigen_backend.h"
+#include "sycldnn/pooling/launch.h"
 #endif  // TENSORFLOW_USE_SYCL
 
 namespace tensorflow {
@@ -389,11 +388,17 @@ class AvgPoolingOp<SYCLDevice, T> : public UnaryOp<T> {
     }
     else {
       auto device = context->eigen_device<SYCLDevice>();
-      sycldnn::backend::EigenBackend backend(device);
-      auto in_ptr = tensor_in.template flat<T>().data();
-      auto out_ptr = output->template flat<T>().data();
-
-      auto status = sd::launch<T, sd::Average, sd::Forward>(in_ptr, out_ptr,
+      auto in_t = tensor_in.template flat<T>();
+      auto out_t = output->template flat<T>();
+      auto in_ptr = in_t.data();
+      auto out_ptr = out_t.data();
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
+      sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Forward>(in_ptr, out_ptr,
           sd_params, backend);
       if (status.status != sycldnn::StatusCode::OK) {
         context->SetStatus(get_sd_err_msg(status));
@@ -981,10 +986,17 @@ class AvgPoolingGradOp<SYCLDevice, T> : public OpKernel {
     }
     else {
       auto device = context->eigen_device<SYCLDevice>();
-      sycldnn::backend::EigenBackend backend(device);
-      auto in_ptr = out_backprop.template flat<T>().data();
-      auto out_ptr = output->template flat<T>().data();
-      auto status = sd::launch<T, sd::Average, sd::Backpropagate>(in_ptr, out_ptr,
+      auto in_t = out_backprop.template flat<T>();
+      auto out_t = output->template flat<T>();
+      auto in_ptr = in_t.data();
+      auto out_ptr = out_t.data();
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
+      sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Backpropagate>(in_ptr, out_ptr,
           sd_params, backend);
       if (status.status != sycldnn::StatusCode::OK) {
         context->SetStatus(get_sd_err_msg(status));

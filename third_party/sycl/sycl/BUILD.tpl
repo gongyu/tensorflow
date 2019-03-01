@@ -29,9 +29,11 @@ cc_library(
         "**/*.h",
         "**/*.hpp",
     ]) + ["@opencl_headers//:OpenCL-Headers"],
-    includes = [".", "include"],
+    includes = ["include"],
     deps = ["@opencl_headers//:OpenCL-Headers"],
 )
+
+# SYCL-DNN
 
 genrule(
     name = "snn_genrule",
@@ -42,21 +44,36 @@ genrule(
     # The build directory depends on TARGET_CPU as the host and sycl
     # toolchains are both building SYCL-DNN in parallel.
     # An empty archive is enough for the host.
-    cmd = "cd external/sycl_dnn_archive && " +
-          "mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ && " +
-          "if [[ \"$@\" =~ \"host\" ]]; then " +
-          "  ar rcs libsycldnn_static.a; " +
-          "else " +
-          "  rm -rf * && " +
-          "  %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log && " +
-          "  make sycl_dnn_static > make_log; " +
-          "fi && " +
-          "cp -f libsycldnn_static.a `dirname ../../../$@`",
+    cmd = """
+          cd external/sycl_dnn_archive &&
+          mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
+          if [[ \"$@\" =~ \"host\" ]]; then
+            ar rcs libsycldnn_static.a;
+          else
+            rm -rf * &&
+            %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log &&
+            make sycl_dnn_static > make_log;
+          fi &&
+          cp -f libsycldnn_static.a `dirname ../../../$@`
+    """,
 )
 
 cc_library(
     name = "sycl_dnn",
     srcs = ["libsycldnn_static.a"],
-    deps = ["@sycl_dnn_archive//:snn_headers"],
+    deps = [
+      "@sycl_dnn_archive//:snn_headers",
+    ],
     linkstatic = 1,
+)
+
+# SYCL-BLAS
+
+cc_library(
+    name = "sycl_blas",
+    hdrs = ["include/vptr/virtual_ptr.hpp"],
+    includes = ["include"],
+    deps = [
+      "@sycl_blas_archive//:sycl_blas_headers",
+    ],
 )

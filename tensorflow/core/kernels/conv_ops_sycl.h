@@ -14,13 +14,12 @@
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
-#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#include "tensorflow/core/kernels/sycl_dnn_utils.h"
 #include "tensorflow/core/kernels/conv_grad_ops.h"
 #include "tensorflow/core/kernels/conv_ops_sycl_launcher.h"
 
-#include "sycldnn/conv2d/launch.h"
 #include "sycldnn/conv2d/selector/default_selector.h"
-#include "sycldnn/backend/eigen_backend.h"
+#include "sycldnn/conv2d/launch.h"
 
 namespace tensorflow {
 
@@ -28,28 +27,29 @@ namespace snn {
 namespace conv2d = sycldnn::conv2d;
 struct SNNSelectorGen final : public conv2d::Selector {
   conv2d::Algorithm select(const conv2d::Conv2DParams& params) override {
-#ifdef ARM_NON_MOBILE
-    if (params.window_rows == params.window_cols && params.stride_rows == params.stride_cols) {
-      if (params.window_rows == 1 && params.stride_rows == 2) {
-        return conv2d::Algorithm::Tiled;
+    if (params.stride_rows == 1 && params.stride_cols == 1) {
+      if (params.window_rows == 1 && params.window_cols == 1) {
+        return conv2d::Algorithm::Matmul;
       }
-      if (params.window_rows == 1 && params.stride_rows == 1) {
-        return conv2d::Algorithm::Tiled;
-      }
-      if (params.window_rows == 3 && params.stride_rows == 1) {
-        if (params.channels < 10) {
-          return conv2d::Algorithm::Direct;
-        } else if (params.in_rows > 100) {
-          return conv2d::Algorithm::Winograd;
-        } else if (params.in_rows > 50) {
-          return conv2d::Algorithm::Im2col;
-        } else {
-          return conv2d::Algorithm::Tiled;
-        }
+      else if ((params.window_rows == 1 && params.window_cols == 3) ||
+               (params.window_rows == 3 && params.window_cols == 1) ||
+               (params.window_rows == 3 && params.window_cols == 3)) {
+        return conv2d::Algorithm::Winograd;
       }
     }
-    return conv2d::Algorithm::Direct;
+#ifdef ARM_NON_MOBILE
+    return conv2d::Algorithm::Tiled;
 #else
+    return conv2d::Algorithm::Im2col;
+#endif
+  }
+
+  const char* name() const override { return "SNNSelectorGen"; }
+};
+
+// FilterBackprop is not supported with tiled convolution so make sure not to select that here
+struct SNNSelectorFilterBackprop final : public conv2d::Selector {
+  conv2d::Algorithm select(const conv2d::Conv2DParams& params) override {
     if (params.stride_rows == 1 && params.stride_cols == 1) {
       if (params.window_rows == 1 && params.window_cols == 1) {
         return conv2d::Algorithm::Matmul;
@@ -61,31 +61,6 @@ struct SNNSelectorGen final : public conv2d::Selector {
       }
     }
     return conv2d::Algorithm::Im2col;
-#endif
-  }
-
-  const char* name() const override { return "SNNSelectorGen"; }
-};
-
-// FilterBackprop is not supported with tiled convolution so make sure not to select that here
-struct SNNSelectorFilterBackprop final : public conv2d::Selector {
-  conv2d::Algorithm select(const conv2d::Conv2DParams& params) override {
-#ifdef ARM_NON_MOBILE
-    if (params.window_rows == params.window_cols && params.stride_rows == params.stride_cols) {
-      if (params.window_rows == 3 && params.stride_rows == 1) {
-        if (params.channels < 10) {
-          return conv2d::Algorithm::Direct;
-        } else if (params.in_rows > 100) {
-          return conv2d::Algorithm::Winograd;
-        } else if (params.in_rows > 50) {
-          return conv2d::Algorithm::Im2col;
-        }
-      }
-    }
-    return conv2d::Algorithm::Direct;
-#else
-    return SNNSelectorGen().select(params);
-#endif
   }
 
   const char* name() const override { return "SNNSelectorFilterBackprop"; }
@@ -158,11 +133,14 @@ struct LaunchConv2DOp<SYCLDevice, T> {
     namespace sd = sycldnn::conv2d;
     auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
 
-    T const* const in_ptr = input.template flat<T>().data();
-    T const* const fil_ptr = filter.template flat<T>().data();
-    T* const out_ptr = output->template flat<T>().data();
+    auto in_t = input.template flat<T>();
+    auto fil_t = filter.template flat<T>();
+    auto out_t = output->template flat<T>();
+
+    auto in_ptr = in_t.data();
+    auto fil_ptr = fil_t.data();
+    auto out_ptr = out_t.data();
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
@@ -175,7 +153,14 @@ struct LaunchConv2DOp<SYCLDevice, T> {
                                             params, out_ptr, sel);
       } else {
         snn::SNNSelectorGen selector;
-        auto status = sd::launch<T, sd::conv_type::Forward>(
+        CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+        auto ph = backend.get_executor().get_policy_handler();
+        in_ptr = attach_pointer<T>(device, ph, in_ptr);
+        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
+        sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::Forward>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
           context->SetStatus(get_sd_err_msg(status));
@@ -227,11 +212,14 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
     namespace sd = sycldnn::conv2d;
     auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
 
-    T const* const in_ptr = out_backprop.template flat<T>().data();
-    T const* const fil_ptr = filter.template flat<T>().data();
-    T* const out_ptr = in_backprop->template flat<T>().data();
+    auto in_t = out_backprop.template flat<T>();
+    auto fil_t = filter.template flat<T>();
+    auto out_t = in_backprop->template flat<T>();
+
+    auto in_ptr = in_t.data();
+    auto fil_ptr = fil_t.data();
+    auto out_ptr = out_t.data();
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
@@ -244,7 +232,14 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
                                                   params, out_ptr, sel);
       } else {
         snn::SNNSelectorGen selector;
-        auto status = sd::launch<T, sd::conv_type::InputBackprop>(
+        CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+        auto ph = backend.get_executor().get_policy_handler();
+        in_ptr = attach_pointer<T>(device, ph, in_ptr);
+        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
+        sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::InputBackprop>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
           context->SetStatus(get_sd_err_msg(status));
@@ -296,11 +291,14 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
     namespace sd = sycldnn::conv2d;
     auto sd_params = snn::sycl_to_sd_params(params);
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
 
-    T const* const in_ptr = input.template flat<T>().data();
-    T const* const fil_ptr = out_backprop.template flat<T>().data();
-    T* const out_ptr = filter_backprop->template flat<T>().data();
+    auto in_t = input.template flat<T>();
+    auto fil_t = out_backprop.template flat<T>();
+    auto out_t = filter_backprop->template flat<T>();
+
+    auto in_ptr = in_t.data();
+    auto fil_ptr = fil_t.data();
+    auto out_ptr = out_t.data();
 
     if (data_format == FORMAT_NCHW) {
       SNN_SELECTOR sel;
@@ -313,7 +311,15 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
                                                    params, out_ptr, sel);
       } else {
         snn::SNNSelectorFilterBackprop selector;
-        auto status = sd::launch<T, sd::conv_type::FilterBackprop>(
+        CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+        auto ph = backend.get_executor().get_policy_handler();
+        in_ptr = attach_pointer<T>(device, ph, in_ptr);
+        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
+        sycldnn::SNNStatus status =
+          sd::launch<T, sd::conv_type::FilterBackprop>(
             in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
         if (status.status != sycldnn::StatusCode::OK) {
           context->SetStatus(get_sd_err_msg(status));

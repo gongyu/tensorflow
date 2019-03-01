@@ -30,6 +30,10 @@ limitations under the License.
 #include "tensorflow/core/platform/stream_executor.h"
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/kernels/sycl_blas_utils.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 #ifdef ARM_COMPUTE_CL
 #include "arm_compute/core/Types.h"
 #include "arm_compute/runtime/CL/CLFunctions.h"
@@ -127,18 +131,14 @@ struct LaunchMatMulBase {
       OpKernelContext* ctx, const Tensor& a, const Tensor& b,
       const Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1>& dim_pair,
       std::vector<AlgorithmType>* algorithms, bool use_aututone, Tensor* out) {
-#ifndef TENSORFLOW_USE_SYCL
     // An explicit vector-matrix multiply is much better optimized than an
     // implicit one and this is a bottleneck during non-batched inference.
     bool was_vector = ExplicitVectorMatrixOptimization<T>(a, b, dim_pair, out);
     if (!was_vector) {
-#endif  // TENSORFLOW_USE_SYCL
       functor::MatMulFunctor<Device, T>()(ctx->eigen_device<Device>(),
                                           out->matrix<T>(), a.matrix<T>(),
                                           b.matrix<T>(), dim_pair);
-#ifndef TENSORFLOW_USE_SYCL
     }
-#endif  // TENSORFLOW_USE_SYCL
   }
 
   static void GetBlasGemmAlgorithm(OpKernelConstruction* ctx,
@@ -151,14 +151,6 @@ struct LaunchMatMulCPU : LaunchMatMulBase<CPUDevice, T> {};
 
 template <typename T, bool USE_CUBLAS>
 struct LaunchMatMul<CPUDevice, T, USE_CUBLAS> : public LaunchMatMulCPU<T> {};
-
-#ifdef TENSORFLOW_USE_SYCL
-template <typename T>
-struct LaunchMatMulSYCL : LaunchMatMulBase<SYCLDevice, T> {};
-
-template <typename T, bool USE_CUBLAS>
-struct LaunchMatMul<SYCLDevice, T, USE_CUBLAS> : public LaunchMatMulSYCL<T> {};
-#endif  // TENSORFLOW_USE_SYCL
 
 #if GOOGLE_CUDA
 
@@ -441,6 +433,40 @@ struct LaunchMatMul<GPUDevice, T, true /* USE_CUBLAS */> {
 
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+template <typename T, bool USE_CUBLAS>
+struct LaunchMatMul<SYCLDevice, T, USE_CUBLAS> {
+  typedef int64 AlgorithmType;
+  static void launch(
+      OpKernelContext* ctx, const Tensor& a, const Tensor& b,
+      const Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1>& dim_pair,
+      std::vector<AlgorithmType>*, bool, Tensor* out) {
+    auto device = ctx->eigen_sycl_device();
+    auto sycl_queue = device.sycl_queue();
+    SYCLBlasExecutor ex(sycl_queue);
+    auto ph = ex.get_policy_handler();
+
+    auto ta = a.matrix<T>();
+    auto tb = b.matrix<T>();
+    auto tc = out->matrix<T>();
+    const auto m = ta.dimension(0);
+    const auto k = ta.dimension(1);
+    const auto n = tb.dimension(1);
+    const auto t_x = dim_pair[0].first ? 'n' : 't';
+    const auto t_y = dim_pair[0].second ? 't' : 'n';
+    auto a_blas_ptr = attach_input_tensor<T>(device, ph, ta);
+    auto b_blas_ptr = attach_input_tensor<T>(device, ph, tb);
+    auto c_blas_ptr = attach_output_tensor<T>(device, ph, tc);
+    blas::_gemm(ex, t_x, t_y, m, n, k, T(1), a_blas_ptr, m,
+                b_blas_ptr, k, T(0), c_blas_ptr, m);
+  }
+
+  static void GetBlasGemmAlgorithm(OpKernelConstruction*,
+                                   std::vector<int64>*,
+                                   bool*) {}
+};
+#endif  // TENSORFLOW_USE_SYCL
+
 template <typename Device, typename T, bool USE_CUBLAS>
 class MatMulOp : public OpKernel {
  public:
@@ -640,20 +666,6 @@ struct MatMulFunctor<CPUDevice, T> {
   }
 };
 
-#ifdef TENSORFLOW_USE_SYCL
-// Partial specialization MatMulFunctor<Device=SYCLDevice, T>.
-template <typename T>
-struct MatMulFunctor<SYCLDevice, T> {
-  void operator()(
-      const SYCLDevice& d, typename MatMulTypes<T>::out_type out,
-      typename MatMulTypes<T>::in_type in0,
-      typename MatMulTypes<T>::in_type in1,
-      const Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1>& dim_pair) {
-    MatMul<SYCLDevice>(d, out, in0, in1, dim_pair);
-  }
-};
-#endif  // TENSORFLOW_USE_SYCL
-
 }  // end namespace functor
 
 #define REGISTER_CPU_EIGEN(T)                                                  \
@@ -709,12 +721,12 @@ TF_CALL_half(REGISTER_GPU);
 #define REGISTER_SYCL(T)                                         \
   REGISTER_KERNEL_BUILDER(                                       \
       Name("MatMul").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
-      MatMulOp<SYCLDevice, T, false /* xxblas */>);              \
+      MatMulOp<SYCLDevice, T, true /* xxblas */>);               \
   REGISTER_KERNEL_BUILDER(Name("MatMul")                         \
                               .Device(DEVICE_SYCL)               \
                               .TypeConstraint<T>("T")            \
-                              .Label("eigen"),                   \
-                          MatMulOp<SYCLDevice, T, false /* xxblas */>)
+                              .Label("sycl-blas"),               \
+                          MatMulOp<SYCLDevice, T, true /* xxblas */>)
 TF_CALL_SYCL_NUMBER_TYPES(REGISTER_SYCL);
 #undef REGISTER_SYCL
 #endif  // TENSORFLOW_USE_SYCL

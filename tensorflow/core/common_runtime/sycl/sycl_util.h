@@ -104,7 +104,7 @@ class SYCLUtil {
     return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
   }
 
-  template<typename T>
+  template <class T>
   static inline cl::sycl::nd_range<1> get_nd_range(const Eigen::SyclDevice& d,
                                                    const T items) {
     const size_t nb_items = static_cast<size_t>(items);
@@ -116,7 +116,7 @@ class SYCLUtil {
                                  cl::sycl::range<1>(group_size));
   }
 
-  template<typename T>
+  template <class T>
   static inline cl::sycl::nd_range<2> get_nd_range(const Eigen::SyclDevice& d,
                                                    const T item_dim0,
                                                    const T item_dim1) {

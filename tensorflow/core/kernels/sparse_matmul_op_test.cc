@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#ifdef EIGEN_USE_SYCL
+#if defined(EIGEN_USE_SYCL) && !defined(EIGEN_DONT_VECTORIZE_SYCL)
 #define EIGEN_DONT_VECTORIZE_SYCL
 #endif  // EIGEN_USE_SYCL
 

@@ -47,12 +47,11 @@ limitations under the License.
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
-#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#include "tensorflow/core/kernels/sycl_dnn_utils.h"
 #include "tensorflow/core/kernels/maxpooling_op_sycl.h"
 
-#include "sycldnn/pooling/launch.h"
 #include "sycldnn/pooling/operators.h"
-#include "sycldnn/backend/eigen_backend.h"
+#include "sycldnn/pooling/launch.h"
 #endif  // TENSORFLOW_USE_SYCL
 
 namespace tensorflow {
@@ -1539,7 +1538,6 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
       return;
 
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
     if (!is_snn_enabled()) {
@@ -1551,6 +1549,12 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
             context, tensor_in, params, output);
       }
     } else {
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
       sycldnn::SNNStatus status;
       if (propagate_nans_) {
         status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
@@ -1655,7 +1659,6 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
       return;
 
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
     if (!is_snn_enabled()) {
@@ -1667,6 +1670,12 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
             context, tensor_in, params, output);
       }
     } else {
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
       sycldnn::SNNStatus status;
       if (propagate_nans_) {
         status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
@@ -1790,7 +1799,6 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
       return;
 
     auto device = context->eigen_device<SYCLDevice>();
-    sycldnn::backend::EigenBackend backend(device);
     auto in_data_ptr = tensor_in.template flat<T>().data();
     auto out_data_ptr = tensor_out.template flat<T>().data();
     auto backprop_ptr = out_backprop.template flat<T>().data();
@@ -1804,6 +1812,14 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
             context, tensor_in, tensor_out, out_backprop, params, output);
       }
     } else {
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      in_data_ptr = attach_pointer<T>(device, ph, in_data_ptr);
+      out_data_ptr = attach_pointer<T>(device, ph, out_data_ptr);
+      backprop_ptr = attach_pointer<T>(device, ph, backprop_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+#endif
       sycldnn::SNNStatus status;
       if (propagate_nans_) {
         status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(in_data_ptr,

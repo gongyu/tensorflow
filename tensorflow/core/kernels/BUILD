@@ -2799,6 +2799,30 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "sycl_blas",
+    hdrs = ["sycl_blas_utils.h"],
+    deps = [
+        "//tensorflow/core:sycl_runtime",
+        "@local_config_sycl//sycl:sycl_blas",
+    ],
+)
+
+cc_library(
+    name = "sycl_dnn",
+    hdrs = [
+        "sycl_dnn_utils.h",
+        "maxpooling_op_sycl.h",
+        "depthwise_conv_op_sycl.h",
+        "pooling_ops_3d_sycl.h",
+    ] + glob(["conv_ops*sycl*.h"]),
+    deps = [
+        ":sycl_blas",
+        "//tensorflow/core:sycl_runtime",
+        "@local_config_sycl//sycl:sycl_dnn",
+    ],
+)
+
 tf_kernel_library(
     name = "aggregate_ops",
     prefix = "aggregate_ops",
@@ -2819,6 +2843,8 @@ tf_kernel_library(
     prefix = "batch_matmul_op",
     deps = MATH_DEPS + if_mkl([
         "//third_party/mkl:intel_binary_blob",
+    ]) + if_sycl([
+        ":sycl_blas",
     ]),
 )
 
@@ -2904,6 +2930,8 @@ tf_kernel_library(
         "//third_party/acl:intel_binary_blob",
     ]) + if_cuda([
         "//tensorflow/core/platform/default/build_config:cublas_plugin",
+    ]) + if_sycl([
+        ":sycl_blas",
     ]),
 )
 
@@ -3291,8 +3319,7 @@ tf_kernel_library(
         "//tensorflow/core/platform/default/build_config:cublas_plugin",
         "//tensorflow/core/platform/default/build_config:cudnn_plugin",
     ]) + if_sycl([
-        "//tensorflow/core:sycl_runtime",
-        "@local_config_sycl//sycl:sycl_dnn",
+        ":sycl_dnn",
     ]),
 )
 
@@ -3315,12 +3342,7 @@ tf_kernel_library(
 
 tf_kernel_library(
     name = "depthwise_conv_grad_op",
-    hdrs = [
-        "depthwise_conv_op.h",
-    ] + if_sycl([
-        "depthwise_conv_op_sycl.h",
-        "conv_ops_sycl_common.h",
-    ]),
+    hdrs = ["depthwise_conv_op.h"],
     prefix = "depthwise_conv_grad_op",
     deps = [
         ":bounds_check",
@@ -3332,6 +3354,8 @@ tf_kernel_library(
         "//tensorflow/core:nn_ops_op_lib",
     ] + if_cuda([
         "@local_config_cuda//cuda:cudnn",
+    ]) + if_sycl([
+        ":sycl_dnn",
     ]),
 )
 
@@ -3572,10 +3596,7 @@ tf_kernel_library(
         "maxpooling_op.h",
         "pooling_ops_3d.h",
         "pooling_ops_common.h",
-    ] + if_sycl([
-        "pooling_ops_3d_sycl.h",
-        "maxpooling_op_sycl.h",
-    ]),
+    ],
     gpu_srcs = [
         "avgpooling_op.h",
         "avgpooling_op_gpu.cu.cc",
@@ -3601,7 +3622,9 @@ tf_kernel_library(
         "//tensorflow/core:nn_ops_op_lib",
         "//tensorflow/core:stream_executor",
         "//third_party/eigen3",
-    ],
+    ] + if_sycl([
+        ":sycl_dnn",
+    ]),
 )
 
 tf_kernel_library(

@@ -159,7 +159,9 @@ class DeviceBase {
   }
 
 #ifdef TENSORFLOW_USE_SYCL
-  void set_eigen_sycl_device(Eigen::SyclDevice* d) { eigen_sycl_device_ = d; }
+  void set_eigen_sycl_device(Eigen::SyclDevice* d) {
+    eigen_sycl_device_ = d;
+  }
 #endif
 
   // Return the Allocator implementation to use based on the allocator

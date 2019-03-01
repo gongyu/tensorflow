@@ -15,7 +15,7 @@ limitations under the License.
 
 // See docs in ../ops/math_ops.cc.
 
-#ifdef EIGEN_USE_SYCL
+#if defined(EIGEN_USE_SYCL) && !defined(EIGEN_DONT_VECTORIZE_SYCL)
 #define EIGEN_DONT_VECTORIZE_SYCL
 #endif  // EIGEN_USE_SYCL
 #define EIGEN_USE_THREADS

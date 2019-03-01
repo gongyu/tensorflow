@@ -7,13 +7,12 @@
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
-#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#include "tensorflow/core/kernels/sycl_dnn_utils.h"
 #include "tensorflow/core/kernels/depthwise_conv_op.h"
 
 #include "sycldnn/accessor_types.h"
 #include "sycldnn/conv2d/conv_type.h"
 #include "sycldnn/depthwise_conv2d/launch.h"
-#include "sycldnn/backend/eigen_backend.h"
 
 //TODO(codeplay): remove later
 #include "tensorflow/core/kernels/conv_ops_sycl_common.h"
@@ -526,8 +525,14 @@ struct LaunchDepthwiseConvOp<SYCLDevice, T> {
       sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
 
       auto device = ctx->template eigen_device<SYCLDevice>();
-      sycldnn::backend::EigenBackend backend(device);
-      auto status = sd::launch<T, sycldnn::conv2d::conv_type::Forward>(input,
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      input = attach_pointer<T>(device, ph, input);
+      depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
+      output = attach_pointer<T>(device, ph, output);
+#endif
+      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::Forward>(input,
           depthwise_filter, output, sd_params, backend);
       if (status.status != sycldnn::StatusCode::OK) {
         ctx->SetStatus(get_sd_err_msg(status));
@@ -572,8 +577,14 @@ struct LaunchDepthwiseConvBackpropInputOp<SYCLDevice, T> {
       sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
 
       auto device = ctx->template eigen_device<SYCLDevice>();
-      sycldnn::backend::EigenBackend backend(device);
-      auto status = sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      out_backprop = attach_pointer<T>(device, ph, out_backprop);
+      depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
+      in_backprop = attach_pointer<T>(device, ph, in_backprop);
+#endif
+      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
           out_backprop, depthwise_filter, in_backprop, sd_params, backend);
       if (status.status != sycldnn::StatusCode::OK) {
         ctx->SetStatus(get_sd_err_msg(status));
@@ -618,8 +629,14 @@ struct LaunchDepthwiseConvBackpropFilterOp<SYCLDevice, T> {
       sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
 
       auto device = ctx->template eigen_device<SYCLDevice>();
-      sycldnn::backend::EigenBackend backend(device);
-      auto status = sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
+      CREATE_SNN_BACKEND(backend, device);
+#ifdef SYCL_SNN_USE_BLAS_BACKEND
+      auto ph = backend.get_executor().get_policy_handler();
+      input = attach_pointer<T>(device, ph, input);
+      out_backprop = attach_pointer<T>(device, ph, out_backprop);
+      filter_backprop = attach_pointer<T>(device, ph, filter_backprop);
+#endif
+      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
           input, out_backprop, filter_backprop, sd_params, backend);
       if (status.status != sycldnn::StatusCode::OK) {
         ctx->SetStatus(get_sd_err_msg(status));
