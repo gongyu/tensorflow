@@ -13,3 +13,10 @@ inline void sleep(unsigned int seconds) { Sleep(1000*seconds); }
 #undef ERROR
 #undef LoadLibrary
 #endif  // _WIN32
+
+#ifdef TENSORFLOW_USE_SYCL
+//TODO(codeplay): Instead of these macros, create a get_buffer method in Eigen that will return a buffer
+// with a correct type (not uint8_t) then get the accessor and the pointer from this
+#define ConvertToActualTypeSycl(Scalar, buf_acc) static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))
+#define ConvertToActualSyclOffset(Scalar, offset) (((offset) * sizeof(buffer_scalar_t)) / sizeof(Scalar))
+#endif // TENSORFLOW_USE_SYCL

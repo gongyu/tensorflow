@@ -1366,7 +1366,7 @@ def set_sycl_extra_options(environ_cp):
   write_action_env_to_bazelrc('TF_SYCL_USE_LOCAL_MEM', use_local_mem)
   if use_local_mem is not 'None':
     prefix = '' if int(use_local_mem) else 'NO_'
-    write_to_bazelrc('build:sycl --cxxopt=-D{}LOCAL_MEM'.format(prefix))
+    write_to_bazelrc('build:sycl --cxxopt=-DEIGEN_SYCL_{}LOCAL_MEM'.format(prefix))
 
   # No need to ask for another question regarding SERIAL_MEMOP,
   # setting this environment variable to 1 fixes a compile_error exception

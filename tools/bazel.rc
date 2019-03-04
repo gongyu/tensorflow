@@ -48,8 +48,7 @@ build:acl --copt=-DARM_COMPUTE_NO_EXCEPTIONS
 build:sycl --crosstool_top=@local_config_sycl//crosstool:toolchain
 build:sycl --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:sycl --define=using_sycl=true
-build:sycl --copt -DUSE_DEFAULT_SELECTOR=1
-build:sycl --copt -DDISABLE_SKINNY=1
+build:sycl --copt -DEIGEN_SYCL_USE_DEFAULT_SELECTOR=1
 
 build:sycl_asan --config=sycl
 build:sycl_asan --copt -fno-omit-frame-pointer --copt -fsanitize-coverage=3

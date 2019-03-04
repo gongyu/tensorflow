@@ -49,7 +49,7 @@ template<typename Index,
          typename RightTensor,
          typename right_nocontract_t, typename right_contract_t,
          bool right_inner_dim_contiguous, bool right_inner_dim_reordered, int RightAlignment, int ShardingType>
-class TensorContractionBlocking<TensorContractionInputMapper<QInt8, Index, Lhs, LeftTensor, left_nocontract_t, left_contract_t, 32, left_inner_dim_contiguous, left_inner_dim_reordered, LeftAlignment>, TensorContractionInputMapper<QUInt8, Index, Rhs, RightTensor, right_nocontract_t, right_contract_t, 32, right_inner_dim_contiguous, right_inner_dim_reordered, RightAlignment>, Index, ShardingType> {
+class TensorContractionBlocking<void, TensorContractionInputMapper<QInt8, Index, Lhs, LeftTensor, left_nocontract_t, left_contract_t, 32, left_inner_dim_contiguous, left_inner_dim_reordered, LeftAlignment>, TensorContractionInputMapper<QUInt8, Index, Rhs, RightTensor, right_nocontract_t, right_contract_t, 32, right_inner_dim_contiguous, right_inner_dim_reordered, RightAlignment>, Index, ShardingType> {
  public:
 
   typedef QInt8  LhsScalar;
@@ -1268,18 +1268,19 @@ void gebp_kernel_any<QInt8, QUInt8, Index, DataMapper, mr, nr, ConjugateLhs, Con
 // Four elements of the same row are arranged contiguously because maddubs and
 // madd both perform an adjacent addition in the kernel.
 template <typename Index, typename DataMapper, int Pack1, int Pack2,
-          bool Conjugate, bool PanelMode>
-struct gemm_pack_lhs<QInt8, Index, DataMapper, Pack1, Pack2, ColMajor,
-                     Conjugate, PanelMode> {
+          typename Packet, bool Conjugate, bool PanelMode>
+struct gemm_pack_lhs<QInt8, Index, DataMapper, Pack1, Pack2, Packet,
+                     ColMajor, Conjugate, PanelMode> {
   EIGEN_DONT_INLINE void operator()(QInt8* blockA, const DataMapper& lhs,
                                     Index depth, Index rows, Index stride = 0,
                                     Index offset = 0);
 };
 
 template <typename Index, typename DataMapper, int Pack1, int Pack2,
-          bool Conjugate, bool PanelMode>
+          typename Packet, bool Conjugate, bool PanelMode>
 EIGEN_DONT_INLINE void gemm_pack_lhs<QInt8, Index, DataMapper, Pack1, Pack2,
-                                     ColMajor, Conjugate, PanelMode>::
+                                     Packet, ColMajor,
+                                     Conjugate, PanelMode>::
 operator()(QInt8* blockA, const DataMapper& lhs, Index depth, Index rows,
            Index stride, Index offset) {
   eigen_assert(stride == 0);
