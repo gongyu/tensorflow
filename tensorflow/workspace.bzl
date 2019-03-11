@@ -107,11 +107,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "sycl_dnn_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/e34546f67dd25431e35aea48a296738bb7f93b11.tar.gz",
-          "https://github.com/codeplaysoftware/SYCL-DNN/archive/e34546f67dd25431e35aea48a296738bb7f93b11.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/496e2890f2bf8c5f7286b03459b283ae9f7d5ba8.tar.gz",
+          "https://github.com/codeplaysoftware/SYCL-DNN/archive/496e2890f2bf8c5f7286b03459b283ae9f7d5ba8.tar.gz",
       ],
-      sha256 = "123394c2a05701f66f26a5397d71f840102b5af5b7a728a155e0a10b2ca0840c",
-      strip_prefix = "SYCL-DNN-e34546f67dd25431e35aea48a296738bb7f93b11",
+      sha256 = "838c0eba9cd803483d2f689af2a08f46828a8320f8eb4996a66c2e4c8e823bdd",
+      strip_prefix = "SYCL-DNN-496e2890f2bf8c5f7286b03459b283ae9f7d5ba8",
       build_file = clean_dep("//third_party/sycl:sycl_dnn.BUILD"),
   )
 
