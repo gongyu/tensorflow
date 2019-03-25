@@ -225,7 +225,7 @@ class CheckNumericsOp<GPUDevice, T> : public AsyncOpKernel {
 template <typename T>
 struct CheckNumericsKernel {
   using write_accessor =
-    cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::discard_write,
+    cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::write,
                        cl::sycl::access::target::global_buffer>;
   using read_accessor =
     cl::sycl::accessor<uint8_t, 1, cl::sycl::access::mode::read,
@@ -246,7 +246,7 @@ struct CheckNumericsKernel {
     if (curr_idx >= size_)
       return;
     const auto curr_val = input[curr_idx];
-    //There is no need to sync output as writing to it is always to true
+    // There is no need to sync output as writing to it is always to true
     if (Eigen::numext::isinf(curr_val))
       output[0] = true;
     else if (Eigen::numext::isnan(curr_val))
@@ -259,69 +259,88 @@ private:
 };
 
 template <typename T>
-class CheckNumericsOp<SYCLDevice, T> : public OpKernel {
+class CheckNumericsOp<SYCLDevice, T> : public AsyncOpKernel {
  public:
-  explicit CheckNumericsOp(OpKernelConstruction* context) : OpKernel(context) {
+  explicit CheckNumericsOp(OpKernelConstruction* context) : AsyncOpKernel(context) {
     // message_ is used as the prefix for the assertion error message. For
     // instance, this can be the name of the input op that produced the tensor.
     OP_REQUIRES_OK(context, context->GetAttr("message", &message_));
   }
 
-  void Compute(OpKernelContext* context) override {
+  void ComputeAsync(OpKernelContext* context, DoneCallback done) override {
     // pass along the input to the output
     context->set_output(0, context->input(0));
-
-    auto in = context->input(0).flat<T>();
-
-    // allocate a tensor of 2 booleans to store the result
-    // out[0] == is_inf out[1] == isnan
-    Tensor tf_out;
-    const auto& allocate_status = context->allocate_temp(DT_BOOL,
-                                    TensorShape({2}), &tf_out);
-    if (TF_PREDICT_FALSE(!allocate_status.ok()))
-    {
-      context->SetStatus(allocate_status);
+    if (context->input(0).NumElements() == 0) {
+      done();
       return;
     }
 
-    auto out = tf_out.flat<bool>();
+    // allocate a tensor of 2 booleans to store the result
+    // out[0] == is_inf out[1] == isnan
+    Tensor abnormal_detected_out;
+    OP_REQUIRES_OK_ASYNC(context, context->allocate_temp(
+                             DT_BOOL, TensorShape({2}), &abnormal_detected_out),
+                         done);
+    auto abnormal_detected_out_ptr = abnormal_detected_out.flat<bool>().data();
+    TensorReference abnormal_detected_ref(abnormal_detected_out);
+
     const auto& d = context->eigen_device<SYCLDevice>();
-    d.memset(out.data(), false, out.size() * sizeof(bool));
+    auto init = [this, abnormal_detected_out_ptr, context]
+        (cl::sycl::handler& cgh) {
+      const auto& d = context->eigen_device<SYCLDevice>();
+      auto output_buffer = d.get_sycl_buffer(abnormal_detected_out_ptr);
+      auto output_discard_write_acc = output_buffer.template get_access<
+                             cl::sycl::access::mode::write>(cgh);
 
-    auto input_buffer = d.get_sycl_buffer(in.data());
-    auto output_buffer = d.get_sycl_buffer(out.data());
+      // Initialize output to 0
+      cgh.fill(output_discard_write_acc, Eigen::buffer_scalar_t(false));
+    };
+    d.sycl_queue().submit(std::move(init));
 
-    d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
-      auto input_access =
+    auto compute_cb = [this, abnormal_detected_out_ptr, context]
+        (cl::sycl::handler& cgh) {
+      auto in = context->input(0).flat<T>();
+
+      const auto& d = context->eigen_device<SYCLDevice>();
+      auto input_buffer = d.get_sycl_buffer(in.data());
+      auto output_buffer = d.get_sycl_buffer(abnormal_detected_out_ptr);
+
+      auto input_acc =
         input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto output_access = output_buffer.template get_access<
-                             cl::sycl::access::mode::discard_write>(cgh);
+      auto output_write_acc = output_buffer.template get_access<
+                             cl::sycl::access::mode::write>(cgh);
 
-      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, in.size());
-      auto kernel = CheckNumericsKernel<T>{input_access, output_access, in.size()};
+      // Write if any value was inf or nan to output
+      cgh.parallel_for(SYCLUtil::get_nd_range(d, in.size()),
+          CheckNumericsKernel<T>{input_acc, output_write_acc, in.size()});
+    };
+    d.sycl_queue().submit(std::move(compute_cb));
 
-      // Kernel writes if any value was inf or nan to out
-      cgh.parallel_for(nd_rng, kernel);
-    });
-    std::array<bool, 2> host_out;
-    Notification done_copy;
-    d.memcpyDeviceToHost(host_out.data(), out.data(), 2 * sizeof(bool),
-        [&done_copy]() { done_copy.Notify(); });
-    done_copy.WaitForNotification();
-    std::string status;
-    if (host_out[0] && host_out[1])
-      status = "Inf and Nan";
-    else if (host_out[0])
-      status = "Inf";
-    else if (host_out[1])
-      status = "Nan";
-    if (!status.empty()) {
-      context->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
-            status, " values"));
-    }
+    auto check_cb = [this, abnormal_detected_ref, context, done]() {
+      string status;
+      bool is_inf = abnormal_detected_host_out_[0];
+      bool is_nan = abnormal_detected_host_out_[1];
+      abnormal_detected_ref.Unref();
+      if (is_inf && is_nan)
+        status = "Inf and Nan";
+      else if (is_inf)
+        status = "Inf";
+      else if (is_nan)
+        status = "Nan";
+      if (!status.empty()) {
+        context->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
+              status, " values"));
+      }
+      done();
+    };
+    d.memcpyDeviceToHost(abnormal_detected_host_out_.data(),
+                         abnormal_detected_out_ptr, 2 * sizeof(bool),
+                         std::move(check_cb));
   }
+
  private:
   string message_;
+  std::array<bool, 2> abnormal_detected_host_out_;
 };
 #endif // TENSORFLOW_USE_SYCL
 
@@ -350,7 +369,7 @@ REGISTER_KERNEL_BUILDER(
 
 #ifdef TENSORFLOW_USE_SYCL
 #define REGISTER_SYCL_KERNELS(T)                                        \
-  REGISTER_KERNEL_BUILDER(                                             \
+  REGISTER_KERNEL_BUILDER(                                              \
       Name("CheckNumerics").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
       CheckNumericsOp<SYCLDevice, T>);
 

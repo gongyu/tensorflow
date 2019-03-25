@@ -1568,6 +1568,7 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
+    device.async_synchronize();
   }
 
  private:
@@ -1689,6 +1690,7 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
+    device.async_synchronize();
   }
 
  private:
@@ -1833,6 +1835,7 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
         return;
       }
     }
+    device.async_synchronize();
   }
 
  private:

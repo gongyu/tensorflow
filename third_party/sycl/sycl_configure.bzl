@@ -274,6 +274,9 @@ def _get_dependencies_substitutions(repository_ctx):
   if platform:
     snn_cmake_options.append("-DCMAKE_CXX_FLAGS=-D{}=1".format(platform))
 
+  snn_cmake_options.append("-DSNN_DOWNLOAD_SYCLBLAS=OFF")
+  snn_cmake_options.append("-DSyclBLAS_DIR=../../sycl_blas_external")
+
   return {
     "%{SNN_EXPORTS}%" : ' '.join(snn_exports),
     "%{SNN_CMAKE_OPTIONS}%" : ' '.join(snn_cmake_options)

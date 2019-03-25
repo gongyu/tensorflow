@@ -168,6 +168,7 @@ struct LaunchConv2DOp<SYCLDevice, T> {
         }
       }
     }
+    device.async_synchronize();
   }
 };
 
@@ -247,6 +248,7 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
         }
       }
     }
+    device.async_synchronize();
   }
 };
 
@@ -327,6 +329,7 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
         }
       }
     }
+    device.async_synchronize();
   }
 };
 

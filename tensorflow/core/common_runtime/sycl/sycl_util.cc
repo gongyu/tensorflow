@@ -28,12 +28,21 @@ void SYCLUtil::copyCPUTensorToDevice(const Eigen::SyclDevice& sycl_device,
   const int64 total_bytes = cpu_tensor.TotalBytes();
   const void *src_ptr = GetBase(&cpu_tensor);
   void *dst_ptr = GetBase(&device_tensor);
+#ifdef EIGEN_SYCL_ASYNC_EXECUTION
   TensorReference input_ref(cpu_tensor);
-  sycl_device.memcpyHostToDevice(dst_ptr, src_ptr, total_bytes,
-                                 [done, input_ref]() {
+  auto callback = [done, input_ref]() {
     input_ref.Unref();
     done(Status::OK());
-  });
+  };
+#else
+  // This will make the copy blocking
+  auto callback = std::function<void()>();
+#endif
+  sycl_device.memcpyHostToDevice(dst_ptr, src_ptr, total_bytes,
+                                 std::move(callback));
+#ifndef EIGEN_SYCL_ASYNC_EXECUTION
+  done(Status::OK());
+#endif
 }
 
 void SYCLUtil::copyDeviceTensorToCPU(const Eigen::SyclDevice& sycl_device,
@@ -43,12 +52,27 @@ void SYCLUtil::copyDeviceTensorToCPU(const Eigen::SyclDevice& sycl_device,
   const int64 total_bytes = device_tensor.TotalBytes();
   const void *src_ptr = GetBase(&device_tensor);
   void *dst_ptr = GetBase(&cpu_tensor);
+#ifdef EIGEN_SYCL_ASYNC_EXECUTION
   TensorReference input_ref(device_tensor);
-  sycl_device.memcpyDeviceToHost(dst_ptr, src_ptr, total_bytes,
-                                 [done, input_ref]() {
+  // For now this copy has to be blocking no matter what, later cone_copy
+  // could be removed.
+  Notification done_copy;
+  auto callback = [&done_copy, done, input_ref]() {
     input_ref.Unref();
     done(Status::OK());
-  });
+    done_copy.Notify();
+  };
+#else
+  // This will make the copy blocking
+  auto callback = std::function<void()>();
+#endif
+  sycl_device.memcpyDeviceToHost(dst_ptr, src_ptr, total_bytes,
+                                 std::move(callback));
+#ifdef EIGEN_SYCL_ASYNC_EXECUTION
+  done_copy.WaitForNotification();
+#else
+  done(Status::OK());
+#endif
 }
 
 void SYCLUtil::copyDeviceTensorToDevice(const Eigen::SyclDevice& sycl_device,

@@ -55,6 +55,12 @@ REGISTER_KERNEL_BUILDER(
     Name("_CopyFromGpuToHost").Device(DEVICE_GPU).HostMemory("output"),
     CopyFromGpuToHostKernel);
 
+#ifdef TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(
+    Name("_CopyFromGpuToHost").Device(DEVICE_SYCL).HostMemory("output"),
+    CopyFromGpuToHostKernel);
+#endif  // TENSORFLOW_USE_SYCL
+
 class CopyFromHostToGpuKernel : public AsyncOpKernel {
  public:
   explicit CopyFromHostToGpuKernel(OpKernelConstruction* context)
@@ -83,6 +89,12 @@ class CopyFromHostToGpuKernel : public AsyncOpKernel {
 REGISTER_KERNEL_BUILDER(
     Name("_CopyFromHostToGpu").Device(DEVICE_GPU).HostMemory("input"),
     CopyFromHostToGpuKernel);
+
+#ifdef TENSORFLOW_USE_SYCL
+REGISTER_KERNEL_BUILDER(
+    Name("_CopyFromHostToGpu").Device(DEVICE_SYCL).HostMemory("input"),
+    CopyFromHostToGpuKernel);
+#endif  // TENSORFLOW_USE_SYCL
 
 }  // namespace
 }  // namespace tensorflow

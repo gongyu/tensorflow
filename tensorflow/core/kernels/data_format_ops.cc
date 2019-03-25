@@ -221,9 +221,13 @@ TF_CALL_int64(REGISTER_SYCL_KERNEL);
 #undef REGISTER_SYCL_KERNEL
 
 #define REGISTER_SYCL_KERNEL(T)                                                \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name("DataFormatVecPermute").Device(DEVICE_SYCL).TypeConstraint<T>("T"), \
-      DataFormatVecPermuteOp<SYCLDevice, T>);
+  REGISTER_KERNEL_BUILDER(Name("DataFormatVecPermute")                         \
+                              .Device(DEVICE_SYCL)                             \
+                              .HostMemory("x")                                 \
+                              .HostMemory("y")                                 \
+                              .Label("host")                                   \
+                              .TypeConstraint<T>("T"),                         \
+                          DataFormatVecPermuteOp<CPUDevice, T>);
 TF_CALL_int32(REGISTER_SYCL_KERNEL);
 TF_CALL_int64(REGISTER_SYCL_KERNEL);
 #undef REGISTER_SYCL_KERNEL
