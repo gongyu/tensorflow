@@ -19,4 +19,8 @@ inline void sleep(unsigned int seconds) { Sleep(1000*seconds); }
 // with a correct type (not uint8_t) then get the accessor and the pointer from this
 #define ConvertToActualTypeSycl(Scalar, buf_acc) static_cast<Scalar*>(static_cast<void*>(((buf_acc.get_pointer().get()))))
 #define ConvertToActualSyclOffset(Scalar, offset) (((offset) * sizeof(buffer_scalar_t)) / sizeof(Scalar))
+
+#ifdef ARM_GPU
+#define EIGEN_SYCL_DISABLE_ARM_GPU_CACHE_OPTIMISATION 1
+#endif
 #endif // TENSORFLOW_USE_SYCL

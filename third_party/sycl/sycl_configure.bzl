@@ -30,6 +30,7 @@ _TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
 _TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
+_TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
 
 _COMPUTECPP_MIN_VERSION = "1.1.0"
 
@@ -255,6 +256,9 @@ def _get_dependencies_substitutions(repository_ctx):
   serial_memop = "ON" if use_serial_memop == "1" else "OFF"
   snn_cmake_options.append("-DSNN_COMPUTECPP_USE_SERIAL_MEMOP={}".format(serial_memop))
 
+  platform = repository_ctx.os.environ[_TF_SYCL_PLATFORM]
+  if platform:
+    snn_cmake_options.append("-DCMAKE_CXX_FLAGS=-D{}=1".format(platform))
 
   return {
     "%{SNN_EXPORTS}%" : ' '.join(snn_exports),

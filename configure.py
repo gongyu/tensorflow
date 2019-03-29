@@ -1359,6 +1359,21 @@ def set_sycl_extra_options(environ_cp):
   if use_double == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
 
+  ALL_PLATFORMS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU']
+  while True:
+    platform = get_from_env_or_user_or_default(environ_cp, 'TF_SYCL_PLATFORM', 'Specify the platform you are compiling for if you know it to enable compile time optimizations, otherwise leave empty:', '')
+    write_action_env_to_bazelrc('TF_SYCL_PLATFORM', platform)
+    if platform:
+      if platform not in ALL_PLATFORMS:
+        print('Unsupported platform: {}'.format(platform))
+        print('Possible values are: {}'.format(ALL_PLATFORMS))
+        environ_cp['TF_SYCL_PLATFORM']= ''
+      else:
+        write_to_bazelrc('build:sycl --copt=-D{}=1'.format(platform))
+        break
+    else:
+      break
+
   # No need to ask for another question regarding LOCAL_MEM,
   # setting this environment variable to 0 or 1 can improve performances
   # depending on whether the device used has local memory.
