@@ -27,12 +27,13 @@ limitations under the License.
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/kernels/sycl_blas_utils.h"
 
-#if defined(SYCL_SNN_USE_EIGEN_BACKEND)
+// TODO(codeplay): Enable SYCL-BLAS backend for SYCL-DNN later
+//#if defined(SYCL_SNN_USE_EIGEN_BACKEND)
 #include "sycldnn/backend/eigen_backend.h"
-#else // Use SYCL-BLAS backend
-#define SYCL_SNN_USE_BLAS_BACKEND 1
-#include "sycldnn/backend/sycl_blas_backend.h"
-#endif
+//#else // Use SYCL-BLAS backend
+//#define SYCL_SNN_USE_BLAS_BACKEND 1
+//#include "sycldnn/backend/sycl_blas_backend.h"
+//#endif
 
 namespace tensorflow {
 

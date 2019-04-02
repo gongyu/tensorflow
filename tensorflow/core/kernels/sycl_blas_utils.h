@@ -55,22 +55,29 @@ using SYCLBlasPolicy = blas::PolicyHandler<blas::codeplay_policy>;
 using SYCLBlasExecutor = blas::Executor<SYCLBlasPolicy>;
 
 template <class T, class PolicyHandler>
-inline T* attach_pointer(const Eigen::SyclDevice& d,
-                         const PolicyHandler& ph, const T* ptr) {
-  auto buffer = d.get_sycl_buffer(ptr);
+inline blas::BufferIterator<T, blas::codeplay_policy>
+    attach_pointer(const Eigen::SyclDevice& d, const PolicyHandler& ph,
+                   const T* ptr) {
+  auto original_buffer = d.get_sycl_buffer(ptr);
   auto offset = d.get_offset(ptr);
-  return ph.template attach_buffer<T>(buffer) + offset;
+  auto buffer = original_buffer.template reinterpret<T>(
+      cl::sycl::range<1>(original_buffer.get_size() / sizeof(T)));
+  auto buffer_iterator = blas::make_sycl_iterator_buffer(buffer);
+  buffer_iterator.set_offset(offset);
+  return buffer_iterator;
 }
 
 template <class T, class PolicyHandler, class Tensor>
-inline T* attach_input_tensor(const Eigen::SyclDevice& d,
-                              const PolicyHandler& ph, const Tensor& t) {
+inline blas::BufferIterator<T, blas::codeplay_policy>
+    attach_input_tensor(const Eigen::SyclDevice& d,
+                        const PolicyHandler& ph, const Tensor& t) {
   return attach_pointer(d, ph, t.data());
 }
 
 template <class T, class PolicyHandler, class Tensor>
-inline T* attach_output_tensor(const Eigen::SyclDevice& d,
-                               const PolicyHandler& ph, const Tensor& t) {
+inline blas::BufferIterator<T, blas::codeplay_policy>
+    attach_output_tensor(const Eigen::SyclDevice& d,
+                         const PolicyHandler& ph, const Tensor& t) {
   return attach_pointer(d, ph, t.data());
 }
 
