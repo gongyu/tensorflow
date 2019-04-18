@@ -536,6 +536,15 @@ extern template struct LaunchDepthwiseConvBackpropInputOp<GPUDevice, double>;
 
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+
+#define EXTERN_INSTANTIATE_SYCL(T) \
+  extern template struct LaunchConv2DBackpropInputOp<SYCLDevice, T>;
+TF_CALL_SYCL_NUMBER_TYPES(EXTERN_INSTANTIATE_SYCL);
+#undef EXTERN_INSTANTIATE_SYCL
+
+#endif  // TENSORFLOW_USE_SYCL
+
 // Kernel to compute the input backprop for depthwise convolution.
 template <typename Device, class T>
 class DepthwiseConv2dNativeBackpropInputOp : public OpKernel {
@@ -1020,6 +1029,15 @@ extern template struct LaunchDepthwiseConvBackpropFilterOp<GPUDevice, float>;
 extern template struct LaunchDepthwiseConvBackpropFilterOp<GPUDevice, double>;
 
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+
+#define EXTERN_INSTANTIATE_SYCL(T) \
+  extern template struct LaunchConv2DBackpropFilterOp<SYCLDevice, T>;
+TF_CALL_SYCL_NUMBER_TYPES(EXTERN_INSTANTIATE_SYCL);
+#undef EXTERN_INSTANTIATE_SYCL
+
+#endif  // TENSORFLOW_USE_SYCL
 
 // Kernel to compute the filter backprop for depthwise convolution.
 template <typename Device, class T>

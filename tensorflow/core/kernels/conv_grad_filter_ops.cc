@@ -1105,6 +1105,12 @@ template struct LaunchConv2DBackpropFilterOp<GPUDevice, double>;
 #endif  // GOOGLE_CUDA
 
 #ifdef TENSORFLOW_USE_SYCL
+// To be used inside depthwise_conv_grad_op.cc.
+#define INSTANTIATE_SYCL_LAUNCH(T) \
+template struct LaunchConv2DBackpropFilterOp<SYCLDevice, T>;
+TF_CALL_SYCL_NUMBER_TYPES(INSTANTIATE_SYCL_LAUNCH);
+#undef INSTANTIATE_SYCL_LAUNCH
+
 #define REGISTER_SYCL_KERNELS(T)                           \
   REGISTER_KERNEL_BUILDER(Name("Conv2DBackpropFilter")     \
                               .Device(DEVICE_SYCL)         \
