@@ -35,6 +35,100 @@ limitations under the License.
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif  // TENSORFLOW_USE_SYCL
+
+namespace functor {
+
+template <typename Device>
+inline Status TensorListBinaryAddSwitch(const Device& d,
+                                        const Tensor& a_tensor,
+                                        const Tensor& b_tensor,
+                                        Tensor& out_tensor) {
+  switch (out_tensor.dtype()) {
+#define DTYPE_CASE(dtype)                                \
+  case DataTypeToEnum<dtype>::value:                     \
+    out_tensor.flat<dtype>().device(d) =                 \
+        a_tensor.flat<dtype>() + b_tensor.flat<dtype>(); \
+    break;
+
+    TF_CALL_NUMBER_TYPES(DTYPE_CASE)
+
+#undef DTYPE_CASE
+    default:
+      return errors::InvalidArgument("Trying to add unsupported dtype ",
+                                     out_tensor.dtype());
+  }
+  return Status::OK();
+}
+
+template <typename Device>
+inline Status TensorListZerosLikeSwitch(const Device& d, Tensor& out_tensor) {
+  switch (out_tensor.dtype()) {
+#define DTYPE_CASE(dtype)                            \
+  case DataTypeToEnum<dtype>::value:                 \
+    out_tensor.flat<dtype>().device(d) =             \
+        out_tensor.flat<dtype>().constant(dtype(0)); \
+    break;
+
+    TF_CALL_NUMBER_TYPES(DTYPE_CASE)
+
+#undef DTYPE_CASE
+    default:
+      return errors::InvalidArgument(
+          "Trying to compute zeros_like for unsupported dtype",
+          out_tensor.dtype());
+  }
+  return Status::OK();
+}
+
+#ifdef TENSORFLOW_USE_SYCL
+template <>
+inline Status TensorListBinaryAddSwitch<SYCLDevice>(const SYCLDevice& d,
+                                                    const Tensor& a_tensor,
+                                                    const Tensor& b_tensor,
+                                                    Tensor& out_tensor) {
+  switch (out_tensor.dtype()) {
+#define DTYPE_CASE(dtype)                                \
+  case DataTypeToEnum<dtype>::value:                     \
+    out_tensor.flat<dtype>().device(d) =                 \
+        a_tensor.flat<dtype>() + b_tensor.flat<dtype>(); \
+    break;
+
+    TF_CALL_SYCL_NUMBER_TYPES(DTYPE_CASE)
+
+#undef DTYPE_CASE
+    default:
+      return errors::InvalidArgument("Trying to add unsupported dtype ",
+                                     out_tensor.dtype());
+  }
+  return Status::OK();
+}
+
+template <>
+inline Status TensorListZerosLikeSwitch<SYCLDevice>(const SYCLDevice& d,
+                                                    Tensor& out_tensor) {
+  switch (out_tensor.dtype()) {
+#define DTYPE_CASE(dtype)                            \
+  case DataTypeToEnum<dtype>::value:                 \
+    out_tensor.flat<dtype>().device(d) =             \
+        out_tensor.flat<dtype>().constant(dtype(0)); \
+    break;
+
+    TF_CALL_SYCL_NUMBER_TYPES(DTYPE_CASE)
+
+#undef DTYPE_CASE
+    default:
+      return errors::InvalidArgument(
+          "Trying to compute zeros_like for unsupported dtype",
+          out_tensor.dtype());
+  }
+  return Status::OK();
+}
+#endif  // TENSORFLOW_USE_SYCL
+
+}  // namespace functor
 
 // Variant compatible type for a list of tensors. This is mutable but instances
 // should never be mutated after stored in a variant tensor.
@@ -235,20 +329,11 @@ Status TensorListBinaryAdd(OpKernelContext* c, const TensorList& a,
     TF_RETURN_IF_ERROR(
         c->allocate_temp(a_tensor.dtype(), a_tensor.shape(), &out_tensor));
     out->tensors.push_back(out_tensor);
-    switch (out_tensor.dtype()) {
-#define DTYPE_CASE(dtype)                                        \
-  case DataTypeToEnum<dtype>::value:                             \
-    out_tensor.flat<dtype>().device(c->eigen_device<Device>()) = \
-        a_tensor.flat<dtype>() + b_tensor.flat<dtype>();         \
-    break;
-
-      TF_CALL_NUMBER_TYPES(DTYPE_CASE)
-
-#undef DTYPE_CASE
-      default:
-        return errors::InvalidArgument("Trying to add unsupported dtype ",
-                                       out_tensor.dtype());
-    }
+    Status s = functor::TensorListBinaryAddSwitch(c->eigen_device<Device>(),
+                                                  a_tensor, b_tensor,
+                                                  out_tensor);
+    if (!s.ok())
+      return s;
   }
   return Status::OK();
 }
@@ -262,21 +347,10 @@ Status TensorListZerosLike(OpKernelContext* c, const TensorList& x,
   for (const Tensor& t : x.tensors) {
     Tensor out_tensor;
     TF_RETURN_IF_ERROR(c->allocate_temp(t.dtype(), t.shape(), &out_tensor));
-    switch (out_tensor.dtype()) {
-#define DTYPE_CASE(dtype)                                        \
-  case DataTypeToEnum<dtype>::value:                             \
-    out_tensor.flat<dtype>().device(c->eigen_device<Device>()) = \
-        out_tensor.flat<dtype>().constant(dtype(0));             \
-    break;
-
-      TF_CALL_NUMBER_TYPES(DTYPE_CASE)
-
-#undef DTYPE_CASE
-      default:
-        return errors::InvalidArgument(
-            "Trying to compute zeros_like for unsupported dtype",
-            out_tensor.dtype());
-    }
+    Status s = functor::TensorListZerosLikeSwitch(c->eigen_device<Device>(),
+                                                  out_tensor);
+    if (!s.ok())
+      return s;
   }
   return Status::OK();
 }
