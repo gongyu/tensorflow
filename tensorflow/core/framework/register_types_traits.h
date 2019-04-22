@@ -71,13 +71,19 @@ struct proxy_type_pod<GPUDevice, 2> {
 };
 
 #ifdef TENSORFLOW_USE_SYCL
+// Use integers as proxy types for SYCL as not all platforms support
+// double or half
 template <>
 struct proxy_type_pod<SYCLDevice, 8> {
-  typedef double type;
+  typedef int64 type;
 };
 template <>
 struct proxy_type_pod<SYCLDevice, 4> {
-  typedef float type;
+  typedef int32 type;
+};
+template <>
+struct proxy_type_pod<SYCLDevice, 2> {
+  typedef int16 type;
 };
 #endif  // TENSORFLOW_USE_SYCL
 
