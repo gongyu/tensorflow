@@ -10,6 +10,8 @@
                          (if using triSYCL instead of ComputeCpp)
   * PYTHON_LIB_PATH: The path to the python lib
   * TF_SYCL_BITCODE_TARGET: The SYCL bitcode target
+  * TF_SYCL_OFFLINE_COMPILER: Optional OpenCL offline compiler
+  * TF_SYCL_OFFLINE_COMPILER_ARGS: Optional OpenCL offline compiler arguments
   * TF_SYCL_CROSS_TOOLCHAIN: The path to the toolchain (only if cross-compiling)
   * TF_SYCL_CROSS_TOOLCHAIN_NAME: The name of the toolchain (only if cross-compiling)
   * TF_USE_HALF_SYCL: Whether to support half type or not
@@ -24,6 +26,8 @@ _COMPUTECPP_TOOLKIT_PATH = "COMPUTECPP_TOOLKIT_PATH"
 _TRISYCL_INCLUDE_DIR = "TRISYCL_INCLUDE_DIR"
 _PYTHON_LIB_PATH = "PYTHON_LIB_PATH"
 _TF_SYCL_BITCODE_TARGET = "TF_SYCL_BITCODE_TARGET"
+_TF_SYCL_OFFLINE_COMPILER = "TF_SYCL_OFFLINE_COMPILER"
+_TF_SYCL_OFFLINE_COMPILER_ARGS = "TF_SYCL_OFFLINE_COMPILER_ARGS"
 _TF_SYCL_CROSS_TOOLCHAIN = "TF_SYCL_CROSS_TOOLCHAIN"
 _TF_SYCL_CROSS_TOOLCHAIN_NAME = "TF_SYCL_CROSS_TOOLCHAIN_NAME"
 _TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
@@ -228,6 +232,16 @@ def _get_dependencies_substitutions(repository_ctx):
 
   if use_computecpp:
     snn_cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
+    computecpp_user_flags = ""
+    offline_compiler = repository_ctx.os.environ[_TF_SYCL_OFFLINE_COMPILER]
+    if offline_compiler:
+      computecpp_user_flags = "{} --sycl-custom-tool={}".format(
+          computecpp_user_flags, offline_compiler)
+      offline_compiler_args = repository_ctx.os.environ[_TF_SYCL_OFFLINE_COMPILER_ARGS]
+      if offline_compiler_args:
+        computecpp_user_flags = "{} -sycl-custom-args '{}'".format(computecpp_user_flags, offline_compiler_args)
+    if computecpp_user_flags:
+      snn_cmake_options.append("-DCOMPUTECPP_USER_FLAGS=\"{}\"".format(computecpp_user_flags))
   else:
     snn_cmake_options.append("-DSNN_TRISYCL=ON")
   snn_cmake_options.append("-DSNN_BUILD_TESTS=OFF")

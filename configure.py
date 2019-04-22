@@ -1305,6 +1305,22 @@ def set_computecpp_vars(environ_cp):
   write_action_env_to_bazelrc('COMPUTECPP_TOOLKIT_PATH',
                               computecpp_toolkit_path)
 
+  # No need to ask for another question regarding offline compilation,
+  # setting TF_SYCL_OFFLINE_COMPILER to the path of an OpenCL offline compiler
+  # will enable offline compilation. Set TF_SYCL_OFFLINE_COMPILER_ARGS for
+  # any arguments needed by the offline compiler.
+  offline_compiler = environ_cp.get('TF_SYCL_OFFLINE_COMPILER', '')
+  offline_compiler_args = environ_cp.get('TF_SYCL_OFFLINE_COMPILER_ARGS', '')
+  write_action_env_to_bazelrc('TF_SYCL_OFFLINE_COMPILER', offline_compiler)
+  write_action_env_to_bazelrc('TF_SYCL_OFFLINE_COMPILER_ARGS', offline_compiler_args)
+  if offline_compiler:
+    write_to_bazelrc('build:sycl --cxxopt=--sycl-custom-tool={}'.format(offline_compiler))
+    if offline_compiler_args:
+        write_to_bazelrc('build:sycl --cxxopt=-sycl-custom-args')
+        write_to_bazelrc('build:sycl --cxxopt=\'{}\''.format(offline_compiler_args))
+  else:
+    write_to_bazelrc('build:sycl --cxxopt=-fsycl-split-modules=20')
+
   default_target = 'spir64'
   ask_sycl_target = ('Please specify which bitcode to target when compiling '
                      'SYCL code. [Default is %s]: ') % (default_target)
@@ -1313,6 +1329,8 @@ def set_computecpp_vars(environ_cp):
       environ_cp, 'TF_SYCL_BITCODE_TARGET', ask_sycl_target,
       default_target)
 
+  if offline_compiler and not sycl_target.startswith("custom-"):
+    sycl_target = "custom-{}".format(sycl_target)
   environ_cp['TF_SYCL_BITCODE_TARGET'] = sycl_target
   write_action_env_to_bazelrc('TF_SYCL_BITCODE_TARGET', sycl_target)
   write_to_bazelrc('build:sycl --define using_trisycl=false')
