@@ -24,7 +24,7 @@ toolchain {
   compiler: "compiler"
   host_system_name: "local"
   needsPic: true
-  supports_gold_linker: false
+  supports_gold_linker: true
   supports_incremental_linker: false
   supports_fission: false
   supports_interface_shared_objects: false
@@ -132,7 +132,7 @@ toolchain {
   compiler: "compiler"
   host_system_name: "%{CROSS_TARGET}%"
   needsPic: true
-  supports_gold_linker: false
+  supports_gold_linker: true
   supports_incremental_linker: false
   supports_fission: false
   supports_interface_shared_objects: false
