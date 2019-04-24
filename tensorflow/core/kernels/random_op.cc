@@ -598,8 +598,8 @@ struct FillPhiloxRandomKernel {
   static constexpr size_t kGeneratorSkipPerOutputGroup = kGroupSize *
     kReservedSamplesPerOutput / PhiloxRandom::kResultElementCount;
 
-  FillPhiloxRandomKernel(write_accessor& data, random::PhiloxRandom& gen,
-                         Distribution& dist, size_t size)
+  FillPhiloxRandomKernel(write_accessor& data, random::PhiloxRandom gen,
+                         Distribution dist, size_t size)
       : data_(data), gen_(gen), dist_(dist), size_(size) {}
 
   void operator()(cl::sycl::nd_item<1> item) {
@@ -646,20 +646,18 @@ void FillPhiloxRandom<SYCLDevice, Distribution>::operator()(
   if (size == 0)
     return;
 
-  const size_t nb_items = (size + Distribution::kResultElementCount - 1) /
-                           Distribution::kResultElementCount;
-
-  auto buffer = device.get_sycl_buffer(data);
-
-  device.sycl_queue().submit([&](cl::sycl::handler& cgh) {
-    auto access =
-      buffer.template get_access<cl::sycl::access::mode::write>(cgh);
+  device.sycl_queue().submit([&device, gen, data, dist, size]
+                              (cl::sycl::handler& cgh) {
+    auto access = device.get_sycl_buffer(data)
+        .template get_access<cl::sycl::access::mode::write>(cgh);
+    const size_t nb_items = (size + Distribution::kResultElementCount - 1) /
+                             Distribution::kResultElementCount;
     cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(device, nb_items);
 
     FillPhiloxRandomKernel<Distribution,
                            Distribution::kVariableSamplesPerOutput>
       task(access, gen, dist, size);
-    cgh.parallel_for<class FillRandomKernel<Distribution>>(nd_rng, task);
+    cgh.parallel_for(nd_rng, task);
   });
 }
 

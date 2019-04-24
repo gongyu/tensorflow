@@ -328,23 +328,19 @@ struct LaunchLRN<SYCLDevice, T> {
 
   void launch(OpKernelContext* context, OpKernel* kernel, const Tensor& in,
               Tensor* output) {
-    const int batch = static_cast<int>(in.dim_size(0));
-    const int rows = static_cast<int>(in.dim_size(1));
-    const int cols = static_cast<int>(in.dim_size(2));
-    const int depth = static_cast<int>(in.dim_size(3));
-    const int reshaped_rows = batch * rows * cols;
-
-    auto device = context->eigen_sycl_device();
-    auto in_buffer = device.get_sycl_buffer(in.template flat<T>().data());
-    auto out_buffer = device.get_sycl_buffer(output->template flat<T>().data());
-
-    auto sycl_queue = device.sycl_queue();
-    sycl_queue.submit([&](cl::sycl::handler& cgh) {
+    auto& device = context->eigen_device<SYCLDevice>();
+    device.sycl_queue().submit([this, &device, kernel, in, output]
+                                (cl::sycl::handler& cgh) {
+      const int batch = static_cast<int>(in.dim_size(0));
+      const int rows = static_cast<int>(in.dim_size(1));
+      const int cols = static_cast<int>(in.dim_size(2));
+      const int depth = static_cast<int>(in.dim_size(3));
+      const int reshaped_rows = batch * rows * cols;
       cl::sycl::nd_range<2> rng = SYCLUtil::get_nd_range(device, reshaped_rows, depth);
-      auto in_acc = in_buffer.template get_access<
-                      cl::sycl::access::mode::read>(cgh);
-      auto out_acc = out_buffer.template get_access<
-                       cl::sycl::access::mode::discard_write>(cgh);
+      auto in_acc = device.get_sycl_buffer(in.template flat<T>().data())
+          .template get_access<cl::sycl::access::mode::read>(cgh);
+      auto out_acc = device.get_sycl_buffer(output->template flat<T>().data())
+          .template get_access<cl::sycl::access::mode::discard_write>(cgh);
       if (beta_ == T(1)) {
         LRNKernelSYCL<T, LRNInvSYCL<T>>
           kernel(depth, depth_radius_, bias_, alpha_, beta_, in_acc, out_acc,

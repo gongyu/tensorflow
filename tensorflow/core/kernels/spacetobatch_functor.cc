@@ -281,17 +281,13 @@ struct SpaceToBatchFunctor<SYCLDevice, T, NUM_BLOCK_DIMS, B2S> {
           "number of batch_tensor elements exceeds 2^32-1");
     }
 
-    const int num_threads = static_cast<int32>(total_count);
-    auto space_tensor_buffer = d.get_sycl_buffer(space_tensor.data());
-    auto batch_tensor_buffer = d.get_sycl_buffer(batch_tensor.data());
-
-    d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
-      auto space_tensor_acc =
-          space_tensor_buffer
-              .template get_access<cl::sycl::access::mode::read_write>(cgh);
-      auto batch_tensor_acc =
-          batch_tensor_buffer
-              .template get_access<cl::sycl::access::mode::read_write>(cgh);
+    const int num_threads = static_cast<int>(total_count);
+    d.sycl_queue().submit([&d, space_tensor, batch_tensor, args, num_threads]
+                           (cl::sycl::handler& cgh) {
+      auto space_tensor_acc = d.get_sycl_buffer(space_tensor.data())
+          .template get_access<cl::sycl::access::mode::read_write>(cgh);
+      auto batch_tensor_acc = d.get_sycl_buffer(batch_tensor.data())
+          .template get_access<cl::sycl::access::mode::read_write>(cgh);
 
       S2BKernel<T, NUM_BLOCK_DIMS, B2S> kernel(space_tensor_acc, args,
                                                batch_tensor_acc, num_threads);

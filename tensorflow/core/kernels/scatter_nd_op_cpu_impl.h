@@ -215,7 +215,7 @@ struct ScatterNdKernel {
       write_accessor out,
       const Index batch_size, const Index slice_size,
       const unsigned int out_size,
-      const cl::sycl::cl_int batch_strides[IXDIM])
+      const size_t batch_strides[IXDIM])
       : indices_(indices),
         updates_(updates),
         out_(out),
@@ -242,7 +242,7 @@ struct ScatterNdKernel {
     for (int idx = 0; idx < batch_size_; ++idx)
     {
       // update_idx is the index of the element that needs to be changed in out
-      auto update_idx = 0;
+      size_t update_idx = 0;
       for (int i = 0; i < IXDIM; ++i)
         update_idx += indices[(idx * IXDIM) + i] * batch_strides_[i];
       update_idx += curr_item;
@@ -260,7 +260,7 @@ struct ScatterNdKernel {
   const Index batch_size_;
   const Index slice_size_;
   const unsigned int out_size_;
-  cl::sycl::cl_int batch_strides_[IXDIM];
+  size_t batch_strides_[IXDIM];
 };
 
 // Implementation of update functor for SYCL.
@@ -279,31 +279,29 @@ struct ScatterNdFunctor<SYCLDevice, T, Index, OP, IXDIM> {
 
     // batch_strides are the number of dimensions in each rank, is used to know
     // how many elements to skip on each rank when accessing indices
-    cl::sycl::cl_int batch_strides[IXDIM];
+    size_t batch_strides[IXDIM];
     for (int dim = 0; dim < IXDIM; ++dim)
     {
       batch_strides[dim] = slice_size;
       for (int i = dim + 1; i < IXDIM; ++i)
-        batch_strides[dim] *= output_shape_prefix[i]; 
+        batch_strides[dim] *= output_shape_prefix[i];
     }
 
-    auto indices_buffer = d.get_sycl_buffer(Tindices.data());
-    auto updates_buffer = d.get_sycl_buffer(Tupdates.data());
-    auto output_buffer = d.get_sycl_buffer(Toutput.data());
-
-    d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
-      auto indices_access =
-          indices_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto updates_access =
-          updates_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-
-      auto output_access =
-          output_buffer.template get_access<cl::sycl::access::mode::read_write>(cgh);
+    d.sycl_queue().submit([&d, Tindices, Tupdates, Toutput, slice_size,
+                           batch_size, batch_strides]
+                           (cl::sycl::handler& cgh) {
+      using mode = cl::sycl::access::mode;
+      auto indices_acc = d.get_sycl_buffer(Tindices.data())
+          .template get_access<mode::read>(cgh);
+      auto updates_acc = d.get_sycl_buffer(Tupdates.data())
+          .template get_access<mode::read>(cgh);
+      auto output_acc = d.get_sycl_buffer(Toutput.data())
+          .template get_access<mode::read_write>(cgh);
 
       cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, slice_size);
 
       ScatterNdKernel<T, Index, OP, IXDIM> kernel(
-          indices_access, updates_access, output_access, batch_size,
+          indices_acc, updates_acc, output_acc, batch_size,
           slice_size, Toutput.size(), batch_strides);
 
       cgh.parallel_for(nd_rng, kernel);

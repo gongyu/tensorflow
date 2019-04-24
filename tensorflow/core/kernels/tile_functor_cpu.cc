@@ -144,34 +144,32 @@ struct TileSYCL {
 template <typename T>
 struct TileFunctor<SYCLDevice, T> {
   void operator()(const SYCLDevice& d, Tensor* out, const Tensor& in) {
-    auto input_buffer = d.get_sycl_buffer(in.template flat<T>().data());
-    auto output_buffer = d.get_sycl_buffer(out->template flat<T>().data());
-    const int ndims = in.dims();
-    const int64 nelem = out->NumElements();
-    gtl::InlinedVector<int64, 8> in_strides = ComputeStride<int64>(in.shape());
-    gtl::InlinedVector<int64, 8> out_strides =
-        ComputeStride<int64>(out->shape());
+    d.sycl_queue().submit([&d, in, out](cl::sycl::handler& cgh) {
+      auto input_buffer = d.get_sycl_buffer(in.template flat<T>().data());
+      auto output_buffer = d.get_sycl_buffer(out->template flat<T>().data());
+      const int ndims = in.dims();
+      const int64 nelem = out->NumElements();
+      gtl::InlinedVector<int64, 8> in_strides =
+          ComputeStride<int64>(in.shape());
+      gtl::InlinedVector<int64, 8> out_strides =
+          ComputeStride<int64>(out->shape());
 
-    // Allocate a temporary [3 x ndims] SYCL buffer.
-    // This holds the input strides, output strides and the input dimensions
-    // needed for the kernel to compute the tile indices.
-    cl::sycl::buffer<int64, 2> stride_buffer(cl::sycl::range<2>(3, ndims));
-    auto stride_host = stride_buffer.template get_access<
-        cl::sycl::access::mode::write>();
-    for (int i = 0; i < ndims; ++i) {
-      stride_host[cl::sycl::id<2>(0, i)] = in_strides[i];
-      stride_host[cl::sycl::id<2>(1, i)] = out_strides[i];
-      stride_host[cl::sycl::id<2>(2, i)] = in.shape().dim_size(i);
-    }
-
-    d.sycl_queue().submit([&](cl::sycl::handler& cgh) {
-      auto input_access =
-          input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto output_access =
-          output_buffer.template get_access<cl::sycl::access::mode::write>(cgh);
-      auto stride_access =
-          stride_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      TileSYCL<T> functor(ndims, input_access, stride_access, output_access, nelem);
+      // Allocate a temporary [3 x ndims] SYCL buffer.
+      // This holds the input strides, output strides and the input dimensions
+      // needed for the kernel to compute the tile indices.
+      cl::sycl::buffer<int64, 2> stride_buffer(cl::sycl::range<2>(3, ndims));
+      auto stride_host = stride_buffer.template get_access<
+          cl::sycl::access::mode::write>();
+      for (int i = 0; i < ndims; ++i) {
+        stride_host[cl::sycl::id<2>(0, i)] = in_strides[i];
+        stride_host[cl::sycl::id<2>(1, i)] = out_strides[i];
+        stride_host[cl::sycl::id<2>(2, i)] = in.shape().dim_size(i);
+      }
+      using mode = cl::sycl::access::mode;
+      auto input_acc = input_buffer.template get_access<mode::read>(cgh);
+      auto stride_acc = stride_buffer.template get_access<mode::read>(cgh);
+      auto output_acc = output_buffer.template get_access<mode::write>(cgh);
+      TileSYCL<T> functor(ndims, input_acc, stride_acc, output_acc, nelem);
 
       cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, nelem);
       cgh.parallel_for(nd_rng, functor);

@@ -149,21 +149,18 @@ struct ReverseSequence<SYCLDevice, T, Tlen, Dims> {
       int32 batch_dim, int32 seq_dim,
       typename TTypes<Tlen>::ConstVec seq_lengths,
       typename TTypes<T, Dims>::Tensor output) {
-    auto seq_lengths_buffer = d.get_sycl_buffer(seq_lengths.data());
-    auto input_buffer = d.get_sycl_buffer(input.data());
-    auto output_buffer = d.get_sycl_buffer(output.data());
-    auto coord_dims = input.dimensions();
-
-    auto sycl_queue = d.sycl_queue();
-    using mode = typename cl::sycl::access::mode;
-    sycl_queue.submit([&](cl::sycl::handler& cgh) {
-      auto seq_lengths_acc =
-        seq_lengths_buffer.template get_access<mode::read>(cgh);
-      auto input_acc = input_buffer.template get_access<mode::read>(cgh);
-      auto output_acc =
-        output_buffer.template get_access<mode::discard_write>(cgh);
+    d.sycl_queue().submit([&d, input, batch_dim, seq_dim, seq_lengths, output]
+                           (cl::sycl::handler& cgh) {
+      using mode = typename cl::sycl::access::mode;
+      auto seq_lengths_acc = d.get_sycl_buffer(seq_lengths.data()).
+          template get_access<mode::read>(cgh);
+      auto input_acc = d.get_sycl_buffer(input.data()).
+          template get_access<mode::read>(cgh);
+      auto output_acc = d.get_sycl_buffer(output.data()).
+          template get_access<mode::discard_write>(cgh);
       ReverseSequenceKernelSYCL<T, Tlen, Dims> kernel(batch_dim, seq_dim,
-          coord_dims, seq_lengths_acc, input_acc, output_acc, input.size());
+          input.dimensions(), seq_lengths_acc, input_acc, output_acc,
+          input.size());
 
       cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, input.size());
       cgh.parallel_for(nd_rng, kernel);

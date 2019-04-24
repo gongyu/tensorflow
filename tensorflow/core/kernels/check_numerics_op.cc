@@ -285,34 +285,31 @@ class CheckNumericsOp<SYCLDevice, T> : public AsyncOpKernel {
     TensorReference abnormal_detected_ref(abnormal_detected_out);
 
     const auto& d = context->eigen_device<SYCLDevice>();
-    auto init = [this, abnormal_detected_out_ptr, context]
+    auto in = context->input(0).flat<T>();
+    auto init = [this, abnormal_detected_out_ptr, &d]
         (cl::sycl::handler& cgh) {
-      const auto& d = context->eigen_device<SYCLDevice>();
       auto output_buffer = d.get_sycl_buffer(abnormal_detected_out_ptr);
-      auto output_discard_write_acc = output_buffer.template get_access<
-                             cl::sycl::access::mode::write>(cgh);
+      auto output_acc = output_buffer.template get_access<
+                            cl::sycl::access::mode::discard_write>(cgh);
 
       // Initialize output to 0
-      cgh.fill(output_discard_write_acc, Eigen::buffer_scalar_t(false));
+      cgh.fill(output_acc, Eigen::buffer_scalar_t(false));
     };
     d.sycl_queue().submit(std::move(init));
 
-    auto compute_cb = [this, abnormal_detected_out_ptr, context]
+    auto compute_cb = [this, abnormal_detected_out_ptr, &d, in]
         (cl::sycl::handler& cgh) {
-      auto in = context->input(0).flat<T>();
-
-      const auto& d = context->eigen_device<SYCLDevice>();
       auto input_buffer = d.get_sycl_buffer(in.data());
       auto output_buffer = d.get_sycl_buffer(abnormal_detected_out_ptr);
 
       auto input_acc =
         input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
-      auto output_write_acc = output_buffer.template get_access<
-                             cl::sycl::access::mode::write>(cgh);
+      auto output_acc = output_buffer.template get_access<
+                            cl::sycl::access::mode::write>(cgh);
 
       // Write if any value was inf or nan to output
       cgh.parallel_for(SYCLUtil::get_nd_range(d, in.size()),
-          CheckNumericsKernel<T>{input_acc, output_write_acc, in.size()});
+          CheckNumericsKernel<T>{input_acc, output_acc, in.size()});
     };
     d.sycl_queue().submit(std::move(compute_cb));
 
