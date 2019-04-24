@@ -237,21 +237,6 @@ class WhereOutputIterator {
   const Eigen::DenseIndex max_row_;
 };
 
-template <typename TIndex, typename T, int NDIM>
-Eigen::array<TIndex, NDIM> CalculateStrides(
-    typename TTypes<T, NDIM>::ConstTensor input) {
-  const Eigen::DSizes<Eigen::DenseIndex, NDIM> dims = input.dimensions();
-  Eigen::array<TIndex, NDIM> strides;
-  EIGEN_STATIC_ASSERT((static_cast<int>(decltype(input)::Layout) ==
-                       static_cast<int>(Eigen::RowMajor)),
-                      INTERNAL_ERROR_INPUT_SHOULD_BE_ROWMAJOR);
-  strides[NDIM - 1] = 1;
-  for (int i = NDIM - 2; i >= 0; --i) {
-    strides[i] = strides[i + 1] * dims[i + 1];
-  }
-  return strides;
-}
-
 template <int NDIM, typename T, typename TIndex>
 struct Where<GPUDevice, NDIM, T, TIndex> {
   EIGEN_ALWAYS_INLINE static Status Compute(

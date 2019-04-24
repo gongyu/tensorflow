@@ -45,10 +45,17 @@ limitations under the License.
 using stream_executor::cuda::ScopedActivateExecutorContext;
 #endif  // GOOGLE_CUDA
 
+#ifdef TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/sycl/sycl_util.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
+#ifdef TENSORFLOW_USE_SYCL
+typedef Eigen::SyclDevice SYCLDevice;
+#endif  // TENSORFLOW_USE_SYCL
 
 namespace functor {
 
@@ -372,5 +379,188 @@ TF_CALL_WHERE_GPU_TYPES(REGISTER_GPU_WHERE_OP);
 #undef REGISTER_GPU_WHERE_OP
 
 #endif  // GOOGLE_CUDA
+
+#ifdef TENSORFLOW_USE_SYCL
+
+namespace functor {
+
+template <typename T, typename TIndex>
+struct InputCumSum {
+  EIGEN_ALWAYS_INLINE static Status Compute(
+      const SYCLDevice& d,
+      typename TTypes<T>::ConstFlat input,
+      typename TTypes<TIndex>::Vec input_cumsum) {
+    auto input_non_zero = input != T(0);
+    return InputCumSum<bool, TIndex>::Compute(
+        d, input_non_zero, input_cumsum);
+  }
+};
+
+template <typename TIndex>
+struct InputCumSum<bool, TIndex> {
+  template <typename Flat>
+  EIGEN_ALWAYS_INLINE static Status Compute(
+      const SYCLDevice& d,
+      Flat input,
+      typename TTypes<TIndex>::Vec input_cumsum) {
+    input_cumsum.device(d) = input.template cast<TIndex>().cumsum(0);
+    return Status::OK();
+  }
+};
+
+template <int NDIM, typename T, typename TIndex>
+struct Where<SYCLDevice, NDIM, T, TIndex> {
+  EIGEN_ALWAYS_INLINE static Status Compute(
+      OpKernelContext*, const SYCLDevice& d,
+      typename TTypes<T, NDIM>::ConstTensor input,
+      typename TTypes<TIndex>::Vec input_cumsum,
+      typename TTypes<int64>::Matrix output,
+      AsyncOpKernel::DoneCallback done) {
+    if (output.dimension(0) == 0) {
+      // Nothing to do.
+      done();
+      return Status::OK();
+    }
+
+    auto compute = [&d, input, input_cumsum, output](cl::sycl::handler& cgh) {
+      const Eigen::array<TIndex, NDIM> strides =
+          CalculateStrides<TIndex, T, NDIM>(input);
+      auto input_buffer = d.get_sycl_buffer(input.data());
+      auto input_cumsum_buffer = d.get_sycl_buffer(input_cumsum.data());
+      auto output_buffer = d.get_sycl_buffer(output.data());
+      auto input_acc =
+          input_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
+      auto input_cumsum_acc =
+          input_cumsum_buffer.template get_access<cl::sycl::access::mode::read>(cgh);
+      auto output_acc =
+          output_buffer.template get_access<cl::sycl::access::mode::discard_write>(cgh);
+      cl::sycl::nd_range<1> nd_rng = SYCLUtil::get_nd_range(d, input.size());
+      cgh.parallel_for<Where<SYCLDevice, NDIM, T, TIndex>>(nd_rng,
+          [=] (cl::sycl::nd_item<1> item) {
+				auto input = ConvertToActualTypeSycl(T, input_acc);
+        auto input_cumsum = ConvertToActualTypeSycl(TIndex, input_cumsum_acc);
+        auto output = ConvertToActualTypeSycl(int64, output_acc);
+        auto id = item.get_global_id(0);
+        if (input[id]) {
+          auto row_lin = (input_cumsum[id] - 1) * NDIM;
+#pragma unroll
+          for (int c = 0; c < NDIM; ++c) {
+            output[row_lin + c] = id / strides[c];
+            id %= strides[c];
+          }
+        }
+      });
+    };
+    d.sycl_queue().submit(std::move(compute));
+
+    // Copy one byte on the host to call the callback once the kernel has
+    // completed
+    bool output_done;
+    d.memcpyDeviceToHost(&output_done, output.data(), sizeof(bool),
+        [done]() { done(); });
+    return Status::OK();
+  }
+};
+
+}  // namespace functor
+
+template <typename T>
+class WhereSYCLOp : public AsyncOpKernel {
+ public:
+  explicit WhereSYCLOp(OpKernelConstruction* context) : AsyncOpKernel(context) {}
+
+  void ComputeAsync(OpKernelContext* context, DoneCallback done) override {
+    const Tensor& input = context->input(0);
+    const int input_dims = input.dims();
+
+    if (input.NumElements() < std::numeric_limits<int32>::max()) {
+      ComputeAsyncType<int32>(input, input_dims, context, done);
+    } else {
+      ComputeAsyncType<int64>(input, input_dims, context, done);
+    }
+  }
+
+  template <typename Tindex>
+  void ComputeAsyncType(const Tensor& input, const int input_dims,
+                        OpKernelContext* context, DoneCallback done) {
+    // Instead of doing a sum to compute num_true, we compute a cumsum to then
+    // get the counter of true elements seen so far.
+    auto input_size = input.NumElements();
+
+    Tensor input_cumsum;
+    OP_REQUIRES_OK_ASYNC(context,
+                         context->allocate_temp(DataTypeToEnum<Tindex>::v(),
+                                                TensorShape({input_size}),
+                                                &input_cumsum),
+                         done);
+
+    auto input_cumsum_t = input_cumsum.vec<Tindex>();
+
+    // Push kernel to stream to get number of true elements.
+    const SYCLDevice& d = context->eigen_device<SYCLDevice>();
+    Status s = functor::InputCumSum<T, Tindex>::Compute(
+        d, input.flat<T>(), input_cumsum_t);
+    OP_REQUIRES_OK_ASYNC(context, s, done);
+
+    // Copy num_true to host;
+    Tindex num_true_host;
+    Notification done_copy;
+    d.memcpyDeviceToHost(&num_true_host, input_cumsum_t.data() + input_size - 1,
+        sizeof(Tindex), [&done_copy]() { done_copy.Notify(); });
+    done_copy.WaitForNotification();
+
+    Tensor* output;
+    OP_REQUIRES_OK_ASYNC(context,
+                         context->allocate_output(
+                             0, TensorShape({num_true_host, input_dims}),
+                             &output),
+                         done);
+
+    // Currently Where<SYCLDevice>::Compute() does not compute found_true
+#define HANDLE_DIM(NDIM)                                             \
+  case NDIM: {                                                       \
+    Status s = functor::Where<SYCLDevice, NDIM, T, Tindex>::Compute( \
+        context, d, input.tensor<T, NDIM>(), input_cumsum_t,         \
+        output->matrix<int64>(), done);                              \
+    OP_REQUIRES_OK_ASYNC(context, s, done);                          \
+  } break;
+
+    switch (input_dims) {
+      HANDLE_DIM(1);
+      HANDLE_DIM(2);
+      HANDLE_DIM(3);
+      HANDLE_DIM(4);
+      HANDLE_DIM(5);
+
+      default:
+        OP_REQUIRES_ASYNC(
+            context, false,
+            errors::InvalidArgument("WhereOp: Unhandled input dimensions: ",
+                                    input_dims),
+            done);
+    }
+#undef HANDLE_DIM
+    // done callback is called by Where<SYCLDevice>::Compute()
+  }
+
+ private:
+  TF_DISALLOW_COPY_AND_ASSIGN(WhereSYCLOp);
+};
+
+#define REGISTER_SYCL_WHERE_OP(T) \
+  REGISTER_KERNEL_BUILDER(        \
+      Name("Where").Device(DEVICE_SYCL).TypeConstraint<T>("T"), WhereSYCLOp<T>);
+
+TF_CALL_bool(REGISTER_SYCL_WHERE_OP);
+TF_CALL_int8(REGISTER_SYCL_WHERE_OP);
+TF_CALL_uint8(REGISTER_SYCL_WHERE_OP);
+TF_CALL_int32(REGISTER_SYCL_WHERE_OP);
+TF_CALL_int64(REGISTER_SYCL_WHERE_OP);
+TF_CALL_float(REGISTER_SYCL_WHERE_OP);
+TF_CALL_SYCL_double(REGISTER_SYCL_WHERE_OP);
+
+#undef REGISTER_SYCL_WHERE_OP
+
+#endif  // TENSORFLOW_USE_SYCL
 
 }  // namespace tensorflow
