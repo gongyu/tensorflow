@@ -38,6 +38,11 @@ _TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
 
 _COMPUTECPP_MIN_VERSION = "1.1.0"
 
+def _optional_get_env(repository_ctx, name, default=None):
+  if name in repository_ctx.os.environ:
+    return repository_ctx.os.environ[name]
+  return default
+
 def _enable_sycl(repository_ctx):
   if _TF_NEED_OPENCL_SYCL in repository_ctx.os.environ:
     enable_sycl = repository_ctx.os.environ[_TF_NEED_OPENCL_SYCL].strip()
@@ -233,11 +238,11 @@ def _get_dependencies_substitutions(repository_ctx):
   if use_computecpp:
     snn_cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
     computecpp_user_flags = ""
-    offline_compiler = repository_ctx.os.environ[_TF_SYCL_OFFLINE_COMPILER]
+    offline_compiler = _optional_get_env(repository_ctx, _TF_SYCL_OFFLINE_COMPILER)
     if offline_compiler:
       computecpp_user_flags = "{} --sycl-custom-tool={}".format(
           computecpp_user_flags, offline_compiler)
-      offline_compiler_args = repository_ctx.os.environ[_TF_SYCL_OFFLINE_COMPILER_ARGS]
+      offline_compiler_args = _optional_get_env(repository_ctx, _TF_SYCL_OFFLINE_COMPILER_ARGS)
       if offline_compiler_args:
         computecpp_user_flags = "{} -sycl-custom-args '{}'".format(computecpp_user_flags, offline_compiler_args)
     if computecpp_user_flags:
@@ -255,22 +260,22 @@ def _get_dependencies_substitutions(repository_ctx):
   bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
   snn_cmake_options.append("-DCOMPUTECPP_BITCODE={}".format(bitcode_target))
 
-  use_half = "ON" if repository_ctx.os.environ[_TF_USE_HALF_SYCL] != "0" else "OFF"
+  use_half = "ON" if _optional_get_env(repository_ctx, _TF_USE_HALF_SYCL) != "0" else "OFF"
   snn_cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
-  use_double = "ON" if repository_ctx.os.environ[_TF_USE_DOUBLE_SYCL] != "0" else "OFF"
+  use_double = "ON" if _optional_get_env(repository_ctx, _TF_USE_DOUBLE_SYCL) != "0" else "OFF"
   snn_cmake_options.append("-DSNN_ENABLE_DOUBLE={}".format(use_double))
 
-  use_local_mem = repository_ctx.os.environ[_TF_SYCL_USE_LOCAL_MEM]
+  use_local_mem = _optional_get_env(repository_ctx, _TF_SYCL_USE_LOCAL_MEM)
   local_mem = "ON" if use_local_mem == "1" else "OFF"
   no_local_mem = "ON" if use_local_mem == "0" else "OFF"
   snn_cmake_options.append("-DSNN_EIGEN_LOCAL_MEM={}".format(local_mem))
   snn_cmake_options.append("-DSNN_EIGEN_NO_LOCAL_MEM={}".format(no_local_mem))
 
-  use_serial_memop = repository_ctx.os.environ[_TF_SYCL_USE_SERIAL_MEMOP]
+  use_serial_memop = _optional_get_env(repository_ctx, _TF_SYCL_USE_SERIAL_MEMOP)
   serial_memop = "ON" if use_serial_memop == "1" else "OFF"
   snn_cmake_options.append("-DSNN_COMPUTECPP_USE_SERIAL_MEMOP={}".format(serial_memop))
 
-  platform = repository_ctx.os.environ[_TF_SYCL_PLATFORM]
+  platform = _optional_get_env(repository_ctx, _TF_SYCL_PLATFORM)
   if platform:
     snn_cmake_options.append("-DCMAKE_CXX_FLAGS=-D{}=1".format(platform))
 
