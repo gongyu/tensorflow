@@ -500,46 +500,24 @@ struct LaunchDepthwiseConvOp<SYCLDevice, T> {
         errors::Unimplemented(
             "Depthwise convolution on SYCL is only supported for NHWC format"));
 
-    if (!is_snn_enabled()) {
-      sycl_conv::DepthwiseConv2DParams params;
-      params.batch_ = args.batch;
-      params.in_rows_ = args.in_rows;
-      params.in_cols_ = args.in_cols;
-      params.channels_ = args.in_depth;
-      params.window_rows_ = args.filter_rows;
-      params.window_cols_ = args.filter_cols;
-      params.channel_multiplier_ = args.depth_multiplier;
-      params.stride_rows_ = args.stride;
-      params.stride_cols_ = args.stride;
-      params.pad_rows_ = args.pad_rows;
-      params.pad_cols_ = args.pad_cols;
-      params.out_rows_ = args.out_rows;
-      params.out_cols_ = args.out_cols;
-      params.out_depth_ = args.out_depth;
-      sycl_conv::DLauncher<T, ConvType::Forward>::launch(
-          ctx->eigen_device<SYCLDevice>(), output, input, depthwise_filter,
-          params);
-    }
-    else {
-      namespace sd = sycldnn::depthwise_conv2d;
-      sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
-
-      auto device = ctx->template eigen_device<SYCLDevice>();
-      CREATE_SNN_BACKEND(backend, device);
+    namespace sd = sycldnn::depthwise_conv2d;
+    sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
+    vlog_depthwise_params(sd_params, data_format, "forward_depthwise_conv2d");
+    auto device = ctx->template eigen_device<SYCLDevice>();
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      input = attach_pointer<T>(device, ph, input);
-      depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
-      output = attach_pointer<T>(device, ph, output);
+    auto ph = backend.get_executor().get_policy_handler();
+    input = attach_pointer<T>(device, ph, input);
+    depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
+    output = attach_pointer<T>(device, ph, output);
 #endif
-      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::Forward>(input,
-          depthwise_filter, output, sd_params, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        ctx->SetStatus(get_sd_err_msg(status));
-        return;
-      }
-      device.async_synchronize();
+    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::Forward>(input,
+        depthwise_filter, output, sd_params, backend);
+    if (status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(status));
+      return;
     }
+    device.async_synchronize();
   }
 };
 
@@ -553,46 +531,24 @@ struct LaunchDepthwiseConvBackpropInputOp<SYCLDevice, T> {
         errors::Unimplemented(
             "Depthwise convolution on SYCL is only supported for NHWC format"));
 
-    if (!is_snn_enabled()) {
-      sycl_conv::DepthwiseConv2DParams params;
-      params.batch_ = args.batch;
-      params.in_rows_ = args.in_rows;
-      params.in_cols_ = args.in_cols;
-      params.channels_ = args.in_depth;
-      params.window_rows_ = args.filter_rows;
-      params.window_cols_ = args.filter_cols;
-      params.channel_multiplier_ = args.depth_multiplier;
-      params.stride_rows_ = args.stride;
-      params.stride_cols_ = args.stride;
-      params.pad_rows_ = args.pad_rows;
-      params.pad_cols_ = args.pad_cols;
-      params.out_rows_ = args.out_rows;
-      params.out_cols_ = args.out_cols;
-      params.out_depth_ = args.out_depth;
-      sycl_conv::DLauncher<T, ConvType::InputBackprop>::launch(
-          ctx->eigen_device<SYCLDevice>(), in_backprop, out_backprop,
-          depthwise_filter, params);
-    }
-    else {
-      namespace sd = sycldnn::depthwise_conv2d;
-      sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
-
-      auto device = ctx->template eigen_device<SYCLDevice>();
-      CREATE_SNN_BACKEND(backend, device);
+    namespace sd = sycldnn::depthwise_conv2d;
+    sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
+    vlog_depthwise_params(sd_params, data_format, "input_backprop_depthwise_conv2d");
+    auto device = ctx->template eigen_device<SYCLDevice>();
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      out_backprop = attach_pointer<T>(device, ph, out_backprop);
-      depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
-      in_backprop = attach_pointer<T>(device, ph, in_backprop);
+    auto ph = backend.get_executor().get_policy_handler();
+    out_backprop = attach_pointer<T>(device, ph, out_backprop);
+    depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
+    in_backprop = attach_pointer<T>(device, ph, in_backprop);
 #endif
-      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
-          out_backprop, depthwise_filter, in_backprop, sd_params, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        ctx->SetStatus(get_sd_err_msg(status));
-        return;
-      }
-      device.async_synchronize();
+    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
+        out_backprop, depthwise_filter, in_backprop, sd_params, backend);
+    if (status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(status));
+      return;
     }
+    device.async_synchronize();
   }
 };
 
@@ -606,46 +562,24 @@ struct LaunchDepthwiseConvBackpropFilterOp<SYCLDevice, T> {
         errors::Unimplemented(
             "Depthwise convolution on SYCL is only supported for NHWC format"));
 
-    if (!is_snn_enabled()) {
-      sycl_conv::DepthwiseConv2DParams params;
-      params.batch_ = args.batch;
-      params.in_rows_ = args.in_rows;
-      params.in_cols_ = args.in_cols;
-      params.channels_ = args.in_depth;
-      params.window_rows_ = args.filter_rows;
-      params.window_cols_ = args.filter_cols;
-      params.channel_multiplier_ = args.depth_multiplier;
-      params.stride_rows_ = args.stride;
-      params.stride_cols_ = args.stride;
-      params.pad_rows_ = args.pad_rows;
-      params.pad_cols_ = args.pad_cols;
-      params.out_rows_ = args.out_rows;
-      params.out_cols_ = args.out_cols;
-      params.out_depth_ = args.out_depth;
-      sycl_conv::DLauncher<T, ConvType::FilterBackprop>::launch(
-          ctx->eigen_device<SYCLDevice>(), filter_backprop, input, out_backprop,
-          params);
-    }
-    else {
-      namespace sd = sycldnn::depthwise_conv2d;
-      sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
-
-      auto device = ctx->template eigen_device<SYCLDevice>();
-      CREATE_SNN_BACKEND(backend, device);
+    namespace sd = sycldnn::depthwise_conv2d;
+    sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
+    vlog_depthwise_params(sd_params, data_format, "filter_backprop_depthwise_conv2d");
+    auto device = ctx->template eigen_device<SYCLDevice>();
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      input = attach_pointer<T>(device, ph, input);
-      out_backprop = attach_pointer<T>(device, ph, out_backprop);
-      filter_backprop = attach_pointer<T>(device, ph, filter_backprop);
+    auto ph = backend.get_executor().get_policy_handler();
+    input = attach_pointer<T>(device, ph, input);
+    out_backprop = attach_pointer<T>(device, ph, out_backprop);
+    filter_backprop = attach_pointer<T>(device, ph, filter_backprop);
 #endif
-      sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
-          input, out_backprop, filter_backprop, sd_params, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        ctx->SetStatus(get_sd_err_msg(status));
-        return;
-      }
-      device.async_synchronize();
+    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
+        input, out_backprop, filter_backprop, sd_params, backend);
+    if (status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(status));
+      return;
     }
+    device.async_synchronize();
   }
 };
 

@@ -29,7 +29,7 @@ limitations under the License.
 namespace tensorflow {
 
 SYCLDevice::~SYCLDevice() {
-  if(gpu_device_info_)
+  if (gpu_device_info_)
     delete gpu_device_info_;
 }
 
@@ -49,7 +49,6 @@ Allocator* SYCLDevice::GetAllocator(AllocatorAttributes attr) {
   else
     return sycl_allocator_;
 }
-
 
 Status SYCLDevice::MaybeCopyTensorToGPU(
     const AllocatorAttributes& alloc_attrs, const Tensor& from, Tensor* to,

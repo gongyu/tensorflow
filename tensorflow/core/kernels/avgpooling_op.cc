@@ -365,47 +365,25 @@ class AvgPoolingOp<SYCLDevice, T> : public UnaryOp<T> {
     if (sd_params.batch == 0)
       return;
 
-    if (!is_snn_enabled()) {
-      const int64 depth = GetTensorDim(tensor_in, data_format_, 'C');
-      const int64 in_batch = GetTensorDim(tensor_in, data_format_, 'N');
-       // Dimension order for these arrays is x, y.
-      std::array<int64, 2> input_size{
-          {GetTensorDim(tensor_in, data_format_, '1'),
-           GetTensorDim(tensor_in, data_format_, '0')}};
-      std::array<int64, 2> window{{GetTensorDim(ksize_, data_format_, '1'),
-                                   GetTensorDim(ksize_, data_format_, '0')}};
-      std::array<int64, 2> stride{{GetTensorDim(stride_, data_format_, '1'),
-                                   GetTensorDim(stride_, data_format_, '0')}};
-      std::array<int64, 2> out, padding;
-      OP_REQUIRES_OK(context,
-                     GetWindowedOutputSize(input_size[0], window[0], stride[0],
-                                           padding_, &out[0], &padding[0]));
-      OP_REQUIRES_OK(context,
-                     GetWindowedOutputSize(input_size[1], window[1], stride[1],
-                                           padding_, &out[1], &padding[1]));
-      LaunchAvgPoolingOpSYCL<T>::launch(context, tensor_in, window, stride,
-                                        padding, data_format_, padding_, output);
-    }
-    else {
-      auto device = context->eigen_device<SYCLDevice>();
-      auto in_t = tensor_in.template flat<T>();
-      auto out_t = output->template flat<T>();
-      auto in_ptr = in_t.data();
-      auto out_ptr = out_t.data();
-      CREATE_SNN_BACKEND(backend, device);
+    auto device = context->eigen_device<SYCLDevice>();
+    auto in_t = tensor_in.template flat<T>();
+    auto out_t = output->template flat<T>();
+    auto in_ptr = in_t.data();
+    auto out_ptr = out_t.data();
+    vlog_pooling_params(sd_params, "forward_avgpooling");
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      in_ptr = attach_pointer<T>(device, ph, in_ptr);
-      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+    auto ph = backend.get_executor().get_policy_handler();
+    in_ptr = attach_pointer<T>(device, ph, in_ptr);
+    out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-      sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Forward>(in_ptr, out_ptr,
-          sd_params, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
-      }
-      device.async_synchronize();
+    sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Forward>(in_ptr, out_ptr,
+        sd_params, backend);
+    if (status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(status));
+      return;
     }
+    device.async_synchronize();
   }
 
  private:
@@ -965,46 +943,25 @@ class AvgPoolingGradOp<SYCLDevice, T> : public OpKernel {
     if (sd_params.batch == 0)
       return;
 
-    if (!is_snn_enabled()) {
-       // Dimension order for these arrays is x, y, z.
-      std::array<int64, 2> input_size{
-          {GetTensorDim(output_shape, data_format_, '1'),
-           GetTensorDim(output_shape, data_format_, '0')}};
-      std::array<int64, 2> window{{GetTensorDim(ksize_, data_format_, '1'),
-                                   GetTensorDim(ksize_, data_format_, '0')}};
-      std::array<int64, 2> stride{{GetTensorDim(stride_, data_format_, '1'),
-                                   GetTensorDim(stride_, data_format_, '0')}};
-      std::array<int64, 2> out, padding;
-      OP_REQUIRES_OK(context,
-                     GetWindowedOutputSize(input_size[0], window[0], stride[0],
-                                           padding_, &out[0], &padding[0]));
-      OP_REQUIRES_OK(context,
-                     GetWindowedOutputSize(input_size[1], window[1], stride[1],
-                                           padding_, &out[1], &padding[1]));
-      LaunchAvgPoolingGradOpSYCL<T>::launch(context, output_shape, out_backprop,
-                                            window, stride, out, padding,
-                                            data_format_, output);
-    }
-    else {
-      auto device = context->eigen_device<SYCLDevice>();
-      auto in_t = out_backprop.template flat<T>();
-      auto out_t = output->template flat<T>();
-      auto in_ptr = in_t.data();
-      auto out_ptr = out_t.data();
-      CREATE_SNN_BACKEND(backend, device);
+    auto device = context->eigen_device<SYCLDevice>();
+    auto in_t = out_backprop.template flat<T>();
+    auto out_t = output->template flat<T>();
+    auto in_ptr = in_t.data();
+    auto out_ptr = out_t.data();
+    vlog_pooling_params(sd_params, "backprop_avgpooling");
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      in_ptr = attach_pointer<T>(device, ph, in_ptr);
-      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+    auto ph = backend.get_executor().get_policy_handler();
+    in_ptr = attach_pointer<T>(device, ph, in_ptr);
+    out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-      sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Backpropagate>(in_ptr, out_ptr,
-          sd_params, backend);
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
-      }
-      device.async_synchronize();
+    sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Backpropagate>(in_ptr, out_ptr,
+        sd_params, backend);
+    if (status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(status));
+      return;
     }
+    device.async_synchronize();
   }
 
  private:

@@ -204,14 +204,13 @@ class SYCLDevice : public LocalDevice {
                                  physical_device_desc)),
         cpu_allocator_(cpu_allocator),
         sycl_allocator_(sycl_allocator),
-        device_context_(ctx) {
-    gpu_device_info_ = new GpuDeviceInfo;
+        device_context_(ctx),
+        gpu_device_info_(new GpuDeviceInfo) {
     gpu_device_info_->default_context = device_context_;
     // TODO(codeplay): Improve to support multiple GPU devices
     gpu_device_info_->gpu_id = 0;
 
     set_tensorflow_gpu_device_info(gpu_device_info_);
-
     set_eigen_sycl_device(sycl_allocator->getSyclDevice());
   }
 
@@ -241,7 +240,7 @@ class SYCLDevice : public LocalDevice {
   Allocator* cpu_allocator_;           // not owned
   SYCLAllocator* sycl_allocator_;      // not owned
   SYCLDeviceContext* device_context_;  // not owned
-  GpuDeviceInfo* gpu_device_info_ = nullptr;
+  GpuDeviceInfo* gpu_device_info_;
 };
 
 }  // namespace tensorflow

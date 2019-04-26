@@ -147,25 +147,20 @@ struct LaunchConv2DOp<SYCLDevice, T> {
       launch_conv2d_nchw<T, ConvType::Forward>(device, in_ptr, fil_ptr,
                                                params, out_ptr, sel);
     } else {
-      if (!is_snn_enabled()) {
-        SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::Forward>(device, in_ptr, fil_ptr,
-                                            params, out_ptr, sel);
-      } else {
-        snn::SNNSelectorGen selector;
-        CREATE_SNN_BACKEND(backend, device);
+      snn::SNNSelectorGen selector;
+      vlog_conv2d_params(sd_params, selector, data_format, "forward_conv2d");
+      CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-        auto ph = backend.get_executor().get_policy_handler();
-        in_ptr = attach_pointer<T>(device, ph, in_ptr);
-        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
-        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-        sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::Forward>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
+      sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::Forward>(
+          in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
     device.async_synchronize();
@@ -227,25 +222,20 @@ struct LaunchConv2DBackpropInputOp<SYCLDevice, T> {
       launch_conv2d_nchw<T, ConvType::InputBackprop>(device, in_ptr, fil_ptr,
                                                      params, out_ptr, sel);
     } else {
-      if (!is_snn_enabled()) {
-        SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::InputBackprop>(device, in_ptr, fil_ptr,
-                                                  params, out_ptr, sel);
-      } else {
-        snn::SNNSelectorGen selector;
-        CREATE_SNN_BACKEND(backend, device);
+      snn::SNNSelectorGen selector;
+      vlog_conv2d_params(sd_params, selector, data_format, "input_backprop_conv2d");
+      CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-        auto ph = backend.get_executor().get_policy_handler();
-        in_ptr = attach_pointer<T>(device, ph, in_ptr);
-        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
-        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-        sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::InputBackprop>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
+      sycldnn::SNNStatus status = sd::launch<T, sd::conv_type::InputBackprop>(
+          in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
     device.async_synchronize();
@@ -307,26 +297,21 @@ struct LaunchConv2DBackpropFilterOp<SYCLDevice, T> {
       launch_conv2d_nchw<T, ConvType::FilterBackprop>(device, in_ptr, fil_ptr,
                                                       params, out_ptr, sel);
     } else {
-      if (!is_snn_enabled()) {
-        SNN_SELECTOR sel;
-        launch_conv2d<T, ConvType::FilterBackprop>(device, in_ptr, fil_ptr,
-                                                   params, out_ptr, sel);
-      } else {
-        snn::SNNSelectorFilterBackprop selector;
-        CREATE_SNN_BACKEND(backend, device);
+      snn::SNNSelectorFilterBackprop selector;
+      vlog_conv2d_params(sd_params, selector, data_format, "filter_backprop_conv2d");
+      CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-        auto ph = backend.get_executor().get_policy_handler();
-        in_ptr = attach_pointer<T>(device, ph, in_ptr);
-        fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
-        out_ptr = attach_pointer<T>(device, ph, out_ptr);
+      auto ph = backend.get_executor().get_policy_handler();
+      in_ptr = attach_pointer<T>(device, ph, in_ptr);
+      fil_ptr = attach_pointer<T>(device, ph, fil_ptr);
+      out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-        sycldnn::SNNStatus status =
-          sd::launch<T, sd::conv_type::FilterBackprop>(
-            in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
-        if (status.status != sycldnn::StatusCode::OK) {
-          context->SetStatus(get_sd_err_msg(status));
-          return;
-        }
+      sycldnn::SNNStatus status =
+        sd::launch<T, sd::conv_type::FilterBackprop>(
+          in_ptr, fil_ptr, out_ptr, sd_params, selector, backend);
+      if (status.status != sycldnn::StatusCode::OK) {
+        context->SetStatus(get_sd_err_msg(status));
+        return;
       }
     }
     device.async_synchronize();

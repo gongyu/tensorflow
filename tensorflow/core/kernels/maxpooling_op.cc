@@ -1537,36 +1537,27 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     if (sd_params.batch == 0)
       return;
 
+    vlog_pooling_params(sd_params, "forward_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (!is_snn_enabled()) {
-      if (propagate_nans_) {
-        LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
-            context, tensor_in, params, output);
-      } else {
-        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(
-            context, tensor_in, params, output);
-      }
-    } else {
-      CREATE_SNN_BACKEND(backend, device);
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      in_ptr = attach_pointer<T>(device, ph, in_ptr);
-      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+    auto ph = backend.get_executor().get_policy_handler();
+    in_ptr = attach_pointer<T>(device, ph, in_ptr);
+    out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-      sycldnn::SNNStatus status;
-      if (propagate_nans_) {
-        status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
-            sd_params, backend);
-      } else {
-        status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
-            sd_params, backend);
-      }
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
-      }
+    sycldnn::SNNStatus status;
+    if (propagate_nans_) {
+      status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+    } else {
+      status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+    }
+    if (status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(status));
+      return;
     }
     device.async_synchronize();
   }
@@ -1659,36 +1650,27 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
     if (sd_params.batch == 0)
       return;
 
+    vlog_pooling_params(sd_params, "forward_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
     auto in_ptr = tensor_in.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (!is_snn_enabled()) {
-      if (propagate_nans_) {
-        LaunchMaxPoolingOpSYCL<T, MaxComparatorWithNans<T>>::launch(
-            context, tensor_in, params, output);
-      } else {
-        LaunchMaxPoolingOpSYCL<T, MaxComparator<T>>::launch(
-            context, tensor_in, params, output);
-      }
-    } else {
-      CREATE_SNN_BACKEND(backend, device);
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      in_ptr = attach_pointer<T>(device, ph, in_ptr);
-      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+    auto ph = backend.get_executor().get_policy_handler();
+    in_ptr = attach_pointer<T>(device, ph, in_ptr);
+    out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-      sycldnn::SNNStatus status;
-      if (propagate_nans_) {
-        status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
-            sd_params, backend);
-      } else {
-        status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
-            sd_params, backend);
-      }
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
-      }
+    sycldnn::SNNStatus status;
+    if (propagate_nans_) {
+      status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+    } else {
+      status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
+          sd_params, backend);
+    }
+    if (status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(status));
+      return;
     }
     device.async_synchronize();
   }
@@ -1800,40 +1782,31 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
     if (sd_params.batch == 0)
       return;
 
+    vlog_pooling_params(sd_params, "backpropagate_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
     auto in_data_ptr = tensor_in.template flat<T>().data();
     auto out_data_ptr = tensor_out.template flat<T>().data();
     auto backprop_ptr = out_backprop.template flat<T>().data();
     auto out_ptr = output->template flat<T>().data();
-    if (!is_snn_enabled()) {
-      if (propagate_nans_) {
-        LaunchMaxPoolingGradOpSYCL<T, EqualWithNans<T>>::launch(
-            context, tensor_in, tensor_out, out_backprop, params, output);
-      } else {
-        LaunchMaxPoolingGradOpSYCL<T, Equal<T>>::launch(
-            context, tensor_in, tensor_out, out_backprop, params, output);
-      }
-    } else {
-      CREATE_SNN_BACKEND(backend, device);
+    CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
-      auto ph = backend.get_executor().get_policy_handler();
-      in_data_ptr = attach_pointer<T>(device, ph, in_data_ptr);
-      out_data_ptr = attach_pointer<T>(device, ph, out_data_ptr);
-      backprop_ptr = attach_pointer<T>(device, ph, backprop_ptr);
-      out_ptr = attach_pointer<T>(device, ph, out_ptr);
+    auto ph = backend.get_executor().get_policy_handler();
+    in_data_ptr = attach_pointer<T>(device, ph, in_data_ptr);
+    out_data_ptr = attach_pointer<T>(device, ph, out_data_ptr);
+    backprop_ptr = attach_pointer<T>(device, ph, backprop_ptr);
+    out_ptr = attach_pointer<T>(device, ph, out_ptr);
 #endif
-      sycldnn::SNNStatus status;
-      if (propagate_nans_) {
-        status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(in_data_ptr,
-            out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
-      } else {
-        status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
-            out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
-      }
-      if (status.status != sycldnn::StatusCode::OK) {
-        context->SetStatus(get_sd_err_msg(status));
-        return;
-      }
+    sycldnn::SNNStatus status;
+    if (propagate_nans_) {
+      status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(in_data_ptr,
+          out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+    } else {
+      status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
+          out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+    }
+    if (status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(status));
+      return;
     }
     device.async_synchronize();
   }

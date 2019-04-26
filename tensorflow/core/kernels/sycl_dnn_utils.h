@@ -21,8 +21,6 @@ limitations under the License.
 #define TENSORFLOW_CORE_KERNELS_SYCL_DNN_UTILS_H_
 
 #include <type_traits>
-//TODO(codeplay): remove later
-#include <cstdlib>
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/kernels/sycl_blas_utils.h"
@@ -35,6 +33,11 @@ limitations under the License.
 //#include "sycldnn/backend/sycl_blas_backend.h"
 //#endif
 
+#include "sycldnn/conv2d/params.h"
+#include "sycldnn/conv2d/launch.h"
+#include "sycldnn/depthwise_conv2d/params.h"
+#include "sycldnn/pooling/params.h"
+
 namespace tensorflow {
 
 template <class SDStatus>
@@ -43,11 +46,93 @@ inline Status get_sd_err_msg(const SDStatus& s) {
       std::to_string(static_cast<int>(s.status)));
 }
 
-//TODO(codeplay): remove later
-inline bool is_snn_enabled() {
-  static const char* use_snn_cstr = std::getenv("TF_SYCL_USE_SNN");
-  static bool use_snn = use_snn_cstr == nullptr || std::string(use_snn_cstr) != "0";
-  return use_snn;
+template <class Selector>
+inline std::string snn_algo_to_str(Selector s,
+                                   const sycldnn::conv2d::Conv2DParams& p) {
+  switch(s.select(p)) {
+    case sycldnn::conv2d::Algorithm::Direct:
+      return "Direct";
+    case sycldnn::conv2d::Algorithm::Tiled:
+      return "Tiled";
+    case sycldnn::conv2d::Algorithm::Im2col:
+      return "Im2col";
+    case sycldnn::conv2d::Algorithm::Winograd:
+      return "Winograd";
+    case sycldnn::conv2d::Algorithm::Matmul:
+      return "Matmul";
+    default:
+      return "NotSupported";
+  }
+}
+
+template <typename Selector>
+inline void vlog_conv2d_params(const sycldnn::conv2d::Conv2DParams& sd_params,
+                               Selector s,
+                               TensorFormat data_format,
+                               const std::string& type) {
+  VLOG(1) << "[SYCL-DNN] thread=" << std::this_thread::get_id()
+          << " type=" << type
+          << " TF_data_format=" << data_format
+          << " SNN_selected=" << snn_algo_to_str(s, sd_params)
+          << " channels=" << sd_params.channels
+          << " features=" << sd_params.features
+          << " batch=" << sd_params.batch
+          << " in_rows=" << sd_params.in_rows
+          << " in_cols=" << sd_params.in_cols
+          << " window_rows=" << sd_params.window_rows
+          << " window_cols=" << sd_params.window_cols
+          << " stride_rows=" << sd_params.stride_rows
+          << " stride_cols=" << sd_params.stride_cols
+          << " out_rows=" << sd_params.out_rows
+          << " out_cols=" << sd_params.out_cols
+          << " pad_rows=" << sd_params.pad_rows
+          << " pad_cols=" << sd_params.pad_cols
+          << " dilation_rows=" << sd_params.dilation_rows
+          << " dilation_cols=" << sd_params.dilation_cols
+          << std::endl;
+}
+
+inline void vlog_depthwise_params(
+    const sycldnn::depthwise_conv2d::DepthwiseConv2DParams& sd_params,
+    TensorFormat data_format, const std::string& type) {
+  VLOG(1) << "[SYCL-DNN] thread=" << std::this_thread::get_id()
+          << " type=" << type
+          << " TF_data_format=" << data_format
+          << " channels=" << sd_params.channels
+          << " channel_multiplier=" << sd_params.channel_multiplier
+          << " batch=" << sd_params.batch
+          << " in_rows=" << sd_params.in_rows
+          << " in_cols=" << sd_params.in_cols
+          << " window_rows=" << sd_params.window_rows
+          << " window_cols=" << sd_params.window_cols
+          << " stride_rows=" << sd_params.stride_rows
+          << " stride_cols=" << sd_params.stride_cols
+          << " out_rows=" << sd_params.out_rows
+          << " out_cols=" << sd_params.out_cols
+          << " pad_rows=" << sd_params.pad_rows
+          << " pad_cols=" << sd_params.pad_cols
+          << std::endl;
+}
+
+inline void vlog_pooling_params(const sycldnn::pooling::PoolingParams& sd_params,
+                                const std::string& type,
+                                bool propagate_nan = false) {
+  VLOG(1) << "[SYCL-DNN] thread=" << std::this_thread::get_id()
+          << " type=" << type
+          << " propagate_nan=" << propagate_nan
+          << " channels=" << sd_params.channels
+          << " batch=" << sd_params.batch
+          << " in_rows=" << sd_params.in_rows
+          << " in_cols=" << sd_params.in_cols
+          << " window_rows=" << sd_params.window_rows
+          << " window_cols=" << sd_params.window_cols
+          << " stride_rows=" << sd_params.stride_rows
+          << " stride_cols=" << sd_params.stride_cols
+          << " out_rows=" << sd_params.out_rows
+          << " out_cols=" << sd_params.out_cols
+          << " pad_rows=" << sd_params.pad_rows
+          << " pad_cols=" << sd_params.pad_cols
+          << std::endl;
 }
 
 #if defined(SYCL_SNN_USE_BLAS_BACKEND)
