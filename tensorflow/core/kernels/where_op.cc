@@ -547,6 +547,8 @@ class WhereSYCLOp : public AsyncOpKernel {
   TF_DISALLOW_COPY_AND_ASSIGN(WhereSYCLOp);
 };
 
+//TODO(codeplay): Enable WhereOp later
+/*
 #define REGISTER_SYCL_WHERE_OP(T) \
   REGISTER_KERNEL_BUILDER(        \
       Name("Where").Device(DEVICE_SYCL).TypeConstraint<T>("T"), WhereSYCLOp<T>);
@@ -560,6 +562,7 @@ TF_CALL_float(REGISTER_SYCL_WHERE_OP);
 TF_CALL_SYCL_double(REGISTER_SYCL_WHERE_OP);
 
 #undef REGISTER_SYCL_WHERE_OP
+*/
 
 #endif  // TENSORFLOW_USE_SYCL
 
