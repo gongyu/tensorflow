@@ -98,10 +98,16 @@ class SYCLUtil {
                                   cpu_tensor);
   }
 
-  static inline const cl::sycl::id<3>
+  static inline cl::sycl::id<3>
     get_max_work_item_tuple(const Eigen::SyclDevice& d) {
     const auto& device = d.sycl_queue().get_device();
     return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
+  }
+
+  static inline size_t get_max_work_group_size(const Eigen::SyclDevice& d) {
+    const auto& device = d.sycl_queue().get_device();
+    return std::min(SYCLUtil::get_max_work_item_tuple(d)[0],
+        device.template get_info<cl::sycl::info::device::max_work_group_size>());
   }
 
   template <class T>
@@ -109,7 +115,7 @@ class SYCLUtil {
                                                    const T items) {
     const size_t nb_items = static_cast<size_t>(items);
     const size_t group_size = std::min(nb_items,
-        SYCLUtil::get_max_work_item_tuple(d)[0]);
+        SYCLUtil::get_max_work_group_size(d));
     const size_t group_count = (nb_items + group_size - 1) / group_size;
 
     return cl::sycl::nd_range<1>(cl::sycl::range<1>(group_count * group_size),
@@ -122,7 +128,7 @@ class SYCLUtil {
                                                    const T item_dim1) {
     const size_t nb_items = static_cast<size_t>(item_dim0);
     const size_t group_size = std::min(nb_items,
-        SYCLUtil::get_max_work_item_tuple(d)[0]);
+        SYCLUtil::get_max_work_group_size(d));
     const size_t group_count = (nb_items + group_size - 1) / group_size;
 
     return cl::sycl::nd_range<2>(
