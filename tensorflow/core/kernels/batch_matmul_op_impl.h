@@ -35,10 +35,6 @@ limitations under the License.
 #include "tensorflow/core/platform/stream_executor.h"
 #endif  // GOOGLE_CUDA
 
-#if TENSORFLOW_USE_SYCL
-#include "tensorflow/core/kernels/sycl_blas_utils.h"
-#endif  // TENSORFLOW_USE_SYCL
-
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
@@ -500,29 +496,33 @@ struct LaunchBatchMatMul<GPUDevice, Eigen::half> {
 
 #ifdef TENSORFLOW_USE_SYCL
 template <typename Scalar>
+struct ParallelMatMulKernelSYCL {
+  static void Run(const OpKernelContext* context, const Tensor& in_x,
+                  const Tensor& in_y, bool adj_x, bool adj_y, Tensor* out,
+                  int start, int limit) {
+    auto Tx = in_x.tensor<Scalar, 3>();
+    auto Ty = in_y.tensor<Scalar, 3>();
+    auto Tz = out->tensor<Scalar, 3>();
+    Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1> contract_pairs;
+    contract_pairs[0] = ContractionDims(adj_x, adj_y);
+    auto d = context->eigen_sycl_device();
+    for (int i = start; i < limit; ++i) {
+      auto x = Tx.template chip<0>(i);
+      auto y = Ty.template chip<0>(i);
+      auto z = Tz.template chip<0>(i);
+      z.device(d) = x.contract(y, contract_pairs);
+    }
+  }
+};
+
+template <typename Scalar>
 struct LaunchBatchMatMul<SYCLDevice, Scalar> {
   static void Launch(OpKernelContext* context, const Tensor& in_x,
                      const Tensor& in_y, bool adj_x, bool adj_y, Tensor* out) {
     // Number of matrix multiplies i.e. size of the batch.
-    const auto batch_size = in_x.dim_size(0);
-    auto device = context->eigen_sycl_device();
-    auto sycl_queue = device.sycl_queue();
-    SYCLBlasExecutor ex(sycl_queue);
-    auto ph = ex.get_policy_handler();
-    auto tx = in_x.tensor<Scalar, 3>();
-    auto ty = in_y.tensor<Scalar, 3>();
-    auto tz = out->tensor<Scalar, 3>();
-    const auto m = tx.dimension(1);
-    const auto k = tx.dimension(2);
-    const auto n = ty.dimension(2);
-    const char t_x = adj_x ? 't' : 'n';
-    const char t_y = adj_y ? 't' : 'n';
-    auto x_blas_ptr = attach_input_tensor<Scalar>(device, ph, tx);
-    auto y_blas_ptr = attach_input_tensor<Scalar>(device, ph, ty);
-    auto z_blas_ptr = attach_output_tensor<Scalar>(device, ph, tz);
-    blas::_gemm_batched(ex, t_x, t_y, m, n, k, Scalar(1), x_blas_ptr, m,
-        y_blas_ptr, k, Scalar(0), z_blas_ptr, m,
-        static_cast<decltype(m)>(batch_size));
+    const int64 batch_size = in_x.dim_size(0);
+    ParallelMatMulKernelSYCL<Scalar>::Run(context, in_x, in_y, adj_x, adj_y,
+                                          out, 0, batch_size);
   }
 };
 #endif  // TENSORFLOW_USE_SYCL
