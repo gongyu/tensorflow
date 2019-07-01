@@ -140,11 +140,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "eigen_archive",
       urls = [
-          "http://mirror.bazel.build/bitbucket.org/codeplaysoftware/eigen/get/838d9784d829.tar.gz",
-          "https://bitbucket.org/codeplaysoftware/eigen/get/838d9784d829.tar.gz",
+          "http://mirror.bazel.build/bitbucket.org/romain_biessy/eigen/get/b6f2052cd6d9.tar.gz",
+          "https://bitbucket.org/romain_biessy/eigen/get/b6f2052cd6d9.tar.gz",
       ],
-      sha256 = "c1c35c620fd5e9b824e29f8d512b0fcccfde44bd57c51916a919c98f1ba834dc",
-      strip_prefix = "codeplaysoftware-eigen-838d9784d829",
+      sha256 = "c859ae028288258411ffebc73b3e4a91df594de0958efb358cbaf332ab960b35",
+      strip_prefix = "romain_biessy-eigen-b6f2052cd6d9",
       build_file = clean_dep("//third_party:eigen.BUILD"),
   )
 
