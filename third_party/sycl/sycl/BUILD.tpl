@@ -37,7 +37,10 @@ cc_library(
 
 genrule(
     name = "snn_genrule",
-    srcs = ["@sycl_dnn_archive//:snn_repo"],
+    srcs = [
+      "@sycl_dnn_archive//:snn_repo",
+      "@opencl_headers//:OpenCL-Headers",
+    ],
     outs = ["libsycldnn_static.a"],
     # Below $_ holds the last argument of the previous command,
     # the extra $ is needed for bazel shell cmd.

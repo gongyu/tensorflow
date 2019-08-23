@@ -220,7 +220,7 @@ def _create_dummy_repository(repository_ctx):
 
 def _get_dependencies_substitutions(repository_ctx):
   snn_exports = []
-  snn_cmake_options = []
+  snn_cmake_options = ["-DOpenCL_INCLUDE_DIR=../../opencl_headers/opencl22/"]
   use_computecpp = _enable_compute_cpp(repository_ctx)
   computecpp_root = _find_computecpp_root(repository_ctx) if use_computecpp else ""
   if _crosscompile(repository_ctx):
