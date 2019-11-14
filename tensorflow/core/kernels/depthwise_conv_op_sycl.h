@@ -503,6 +503,7 @@ struct LaunchDepthwiseConvOp<SYCLDevice, T> {
     namespace sd = sycldnn::depthwise_conv2d;
     sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
     vlog_depthwise_params(sd_params, data_format, "forward_depthwise_conv2d");
+
     auto device = ctx->template eigen_device<SYCLDevice>();
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
@@ -534,6 +535,7 @@ struct LaunchDepthwiseConvBackpropInputOp<SYCLDevice, T> {
     namespace sd = sycldnn::depthwise_conv2d;
     sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
     vlog_depthwise_params(sd_params, data_format, "input_backprop_depthwise_conv2d");
+
     auto device = ctx->template eigen_device<SYCLDevice>();
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
@@ -565,6 +567,7 @@ struct LaunchDepthwiseConvBackpropFilterOp<SYCLDevice, T> {
     namespace sd = sycldnn::depthwise_conv2d;
     sd::DepthwiseConv2DParams sd_params = get_sd_params(args);
     vlog_depthwise_params(sd_params, data_format, "filter_backprop_depthwise_conv2d");
+
     auto device = ctx->template eigen_device<SYCLDevice>();
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND

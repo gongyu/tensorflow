@@ -100,11 +100,13 @@ struct TensorEvaluator<const TensorMirrorPadOp<PaddingDimensions, ArgType>,
   typedef typename PacketType<CoeffReturnType, Device>::type PacketReturnType;
   typedef StorageMemory<CoeffReturnType, Device> Storage;
   typedef typename Storage::Type EvaluatorPointerType;
+  typedef internal::TensorBlockNotImplemented TensorBlockV2;
 
   enum {
     IsAligned = false,
     PacketAccess = TensorEvaluator<ArgType, Device>::PacketAccess,
     BlockAccess = false,
+    BlockAccessV2 = false,
     PreferBlockAccess = false,
     Layout = TensorEvaluator<ArgType, Device>::Layout,
     CoordAccess = true,

@@ -1280,16 +1280,16 @@ def set_computecpp_vars(environ_cp):
   def toolkit_exists(toolkit_path):
     """Check if a computecpp toolkit path is valid."""
     if is_linux():
-      sycl_rt_lib_path = 'lib/libComputeCpp.so'
+      sycl_lib_path = 'lib/libComputeCpp.so'
     else:
-      sycl_rt_lib_path = ''
+      sycl_lib_path = ''
 
-    sycl_rt_lib_path_full = os.path.join(toolkit_path,
-                                         sycl_rt_lib_path)
-    exists = os.path.exists(sycl_rt_lib_path_full)
+    sycl_lib_path_full = os.path.join(toolkit_path,
+                                         sycl_lib_path)
+    exists = os.path.exists(sycl_lib_path_full)
     if not exists:
       print('Invalid SYCL %s library path. %s cannot be found' %
-            (_TF_OPENCL_VERSION, sycl_rt_lib_path_full))
+            (_TF_OPENCL_VERSION, sycl_lib_path_full))
     return exists
 
   computecpp_toolkit_path = prompt_loop_or_load_from_env(
@@ -1401,6 +1401,7 @@ def set_sycl_extra_options(environ_cp):
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '1')
     write_to_bazelrc('build:sycl --cpu=arm')
     write_to_bazelrc('build:sycl --copt=-DARM_NON_MOBILE')
+    write_to_bazelrc('build:sycl --copt=-DEIGEN_DONT_VECTORIZE_SYCL')
 
   # Platforms are a compile time option that affect which kernel to choose for
   # expensive operations such as convolutions and matrix multiplication.
@@ -1428,8 +1429,7 @@ def set_sycl_extra_options(environ_cp):
   if use_double == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
 
-  # No need to ask for another question regarding LOCAL_MEM,
-  # setting this environment variable to 0 or 1 can improve performances
+  # Setting TF_SYCL_USE_LOCAL_MEM to 0 or 1 can improve performances
   # depending on whether the device used has local memory.
   use_local_mem = environ_cp.get('TF_SYCL_USE_LOCAL_MEM', 'None')
   write_action_env_to_bazelrc('TF_SYCL_USE_LOCAL_MEM', use_local_mem)
@@ -1437,8 +1437,7 @@ def set_sycl_extra_options(environ_cp):
     prefix = '' if int(use_local_mem) else 'NO_'
     write_to_bazelrc('build:sycl --cxxopt=-DEIGEN_SYCL_{}LOCAL_MEM'.format(prefix))
 
-  # No need to ask for another question regarding SERIAL_MEMOP,
-  # setting this environment variable to 1 fixes a compile_error exception
+  # Setting TF_SYCL_USE_SERIAL_MEMOP to 1 fixes a compile_error exception
   # on devices that do not support memory intrisics.
   use_serial_memop = int(environ_cp.get('TF_SYCL_USE_SERIAL_MEMOP', '0'))
   write_action_env_to_bazelrc('TF_SYCL_USE_SERIAL_MEMOP', use_serial_memop)
@@ -1507,7 +1506,7 @@ def set_grpc_build_flags():
 
 
 def set_build_strip_flag():
-  write_to_bazelrc('build --strip=always')
+  write_to_bazelrc('build:opt --strip=always')
 
 
 def set_windows_build_flags():

@@ -67,18 +67,6 @@ inline blas::BufferIterator<T, blas::codeplay_policy>
   return blas::BufferIterator<T, blas::codeplay_policy>(buffer, offset);
 }
 
-template <class T, class Tensor>
-inline blas::BufferIterator<T, blas::codeplay_policy>
-    attach_input_tensor(const Eigen::SyclDevice& d, const Tensor& t) {
-  return attach_pointer(d, t.data());
-}
-
-template <class T, class Tensor>
-inline blas::BufferIterator<T, blas::codeplay_policy>
-    attach_output_tensor(const Eigen::SyclDevice& d, const Tensor& t) {
-  return attach_pointer(d, t.data());
-}
-
 template <typename IndexT>
 inline void vlog_blas_params(const std::string& type, IndexT m, IndexT n,
                              IndexT k, char t_x, char t_y,

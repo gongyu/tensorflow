@@ -98,16 +98,8 @@ class SYCLUtil {
                                   cpu_tensor);
   }
 
-  static inline cl::sycl::id<3>
-    get_max_work_item_tuple(const Eigen::SyclDevice& d) {
-    const auto& device = d.sycl_queue().get_device();
-    return device.template get_info<cl::sycl::info::device::max_work_item_sizes>();
-  }
-
   static inline size_t get_max_work_group_size(const Eigen::SyclDevice& d) {
-    const auto& device = d.sycl_queue().get_device();
-    return std::min(SYCLUtil::get_max_work_item_tuple(d)[0],
-        device.template get_info<cl::sycl::info::device::max_work_group_size>());
+    return std::min(d.maxWorkItemSizes()[0], d.maxSyclThreadsPerBlock());
   }
 
   template <class T>

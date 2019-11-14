@@ -25,13 +25,11 @@ limitations under the License.
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/kernels/sycl_blas_utils.h"
 
-// TODO(codeplay): Enable SYCL-BLAS backend for SYCL-DNN later
-//#if defined(SYCL_SNN_USE_EIGEN_BACKEND)
+#if defined(SYCL_SNN_USE_EIGEN_BACKEND)
 #include "sycldnn/backend/eigen_backend.h"
-//#else // Use SYCL-BLAS backend
-//#define SYCL_SNN_USE_BLAS_BACKEND 1
-//#include "sycldnn/backend/sycl_blas_backend.h"
-//#endif
+#else
+#include "sycldnn/backend/sycl_blas_backend.h"
+#endif
 
 #include "sycldnn/conv2d/params.h"
 #include "sycldnn/conv2d/launch.h"
@@ -40,40 +38,27 @@ limitations under the License.
 
 namespace tensorflow {
 
+// Backends cannot be copied or moved so they are constructed in a macro
+#if defined(SYCL_SNN_USE_EIGEN_BACKEND)
+#define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
+  sycldnn::backend::EigenBackend BACKEND(DEVICE)
+#else
+#define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
+  sycldnn::backend::SyclBLASBackend BACKEND(DEVICE.sycl_queue())
+#endif
+
 template <class SDStatus>
 inline Status get_sd_err_msg(const SDStatus& s) {
   return errors::Internal("Internal error from SYCL-DNN code " +
       std::to_string(static_cast<int>(s.status)));
 }
 
-template <class Selector>
-inline std::string snn_algo_to_str(Selector s,
-                                   const sycldnn::conv2d::Conv2DParams& p) {
-  switch(s.select(p)) {
-    case sycldnn::conv2d::Algorithm::Direct:
-      return "Direct";
-    case sycldnn::conv2d::Algorithm::Tiled:
-      return "Tiled";
-    case sycldnn::conv2d::Algorithm::Im2col:
-      return "Im2col";
-    case sycldnn::conv2d::Algorithm::Winograd:
-      return "Winograd";
-    case sycldnn::conv2d::Algorithm::Matmul:
-      return "Matmul";
-    default:
-      return "NotSupported";
-  }
-}
-
-template <typename Selector>
 inline void vlog_conv2d_params(const sycldnn::conv2d::Conv2DParams& sd_params,
-                               Selector s,
                                TensorFormat data_format,
                                const std::string& type) {
   VLOG(1) << "[SYCL-DNN] thread=" << std::this_thread::get_id()
           << " type=" << type
           << " TF_data_format=" << data_format
-          << " SNN_selected=" << snn_algo_to_str(s, sd_params)
           << " channels=" << sd_params.channels
           << " features=" << sd_params.features
           << " batch=" << sd_params.batch
@@ -134,14 +119,6 @@ inline void vlog_pooling_params(const sycldnn::pooling::PoolingParams& sd_params
           << " pad_cols=" << sd_params.pad_cols
           << std::endl;
 }
-
-#if defined(SYCL_SNN_USE_BLAS_BACKEND)
-#define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
-  sycldnn::backend::SyclBLASBackend BACKEND(DEVICE.sycl_queue())
-#else // Use Eigen backend
-#define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
-  sycldnn::backend::EigenBackend BACKEND(DEVICE)
-#endif
 
 }  // tensorflow
 

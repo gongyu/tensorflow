@@ -1539,8 +1539,10 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
 
     vlog_pooling_params(sd_params, "forward_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
-    auto in_ptr = tensor_in.template flat<T>().data();
-    auto out_ptr = output->template flat<T>().data();
+    auto in_t = tensor_in.template flat<T>();
+    auto out_t = output->template flat<T>();
+    auto in_ptr = in_t.data();
+    auto out_ptr = out_t.data();
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
     auto ph = backend.get_executor().get_policy_handler();
@@ -1652,8 +1654,10 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
 
     vlog_pooling_params(sd_params, "forward_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
-    auto in_ptr = tensor_in.template flat<T>().data();
-    auto out_ptr = output->template flat<T>().data();
+    auto in_t = tensor_in.template flat<T>();
+    auto out_t = output->template flat<T>();
+    auto in_ptr = in_t.data();
+    auto out_ptr = out_t.data();
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
     auto ph = backend.get_executor().get_policy_handler();
@@ -1784,10 +1788,17 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
 
     vlog_pooling_params(sd_params, "backpropagate_maxpooling", propagate_nans_);
     auto device = context->eigen_device<SYCLDevice>();
-    auto in_data_ptr = tensor_in.template flat<T>().data();
-    auto out_data_ptr = tensor_out.template flat<T>().data();
-    auto backprop_ptr = out_backprop.template flat<T>().data();
-    auto out_ptr = output->template flat<T>().data();
+
+    auto in_data_t = tensor_in.template flat<T>();
+    auto out_data_t = tensor_out.template flat<T>();
+    auto backprop_t = out_backprop.template flat<T>();
+    auto out_t = output->template flat<T>();
+
+    auto in_data_ptr = in_data_t.data();
+    auto out_data_ptr = out_data_t.data();
+    auto backprop_ptr = backprop_t.data();
+    auto out_ptr = out_t.data();
+
     CREATE_SNN_BACKEND(backend, device);
 #ifdef SYCL_SNN_USE_BLAS_BACKEND
     auto ph = backend.get_executor().get_policy_handler();

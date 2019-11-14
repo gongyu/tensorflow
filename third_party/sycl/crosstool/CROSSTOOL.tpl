@@ -103,8 +103,6 @@ toolchain {
     mode: DBG
     compiler_flag: "-g"
     compiler_flag: "-O0"
-    compiler_flag: "-DDEBUG"
-    compiler_flag: "-D_GLIBCXX_DEBUG"
     compiler_flag: "-fexceptions"
     compiler_flag: "-DEIGEN_EXCEPTIONS"
   }
@@ -113,6 +111,7 @@ toolchain {
     mode: OPT
     compiler_flag: "-g0"
     compiler_flag: "-O2"
+    compiler_flag: "-fno-exceptions"
     compiler_flag: "-DNDEBUG"
     cxx_flag: "-Xsycl-device"
     cxx_flag: "-mllvm"
@@ -216,18 +215,15 @@ toolchain {
     mode: DBG
     compiler_flag: "-g"
     compiler_flag: "-O0"
-    compiler_flag: "-DDEBUG"
-    compiler_flag: "-D_GLIBCXX_DEBUG"
     compiler_flag: "-fexceptions"
     compiler_flag: "-DEIGEN_EXCEPTIONS"
-    # Seems to be needed for ARM only
-    compiler_flag: "-mcmodel=large"
   }
 
   compilation_mode_flags {
     mode: OPT
     compiler_flag: "-g0"
     compiler_flag: "-O2"
+    compiler_flag: "-fno-exceptions"
     compiler_flag: "-DNDEBUG"
     cxx_flag: "-Xsycl-device"
     cxx_flag: "-mllvm"

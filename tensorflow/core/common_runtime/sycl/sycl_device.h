@@ -170,8 +170,8 @@ class GSYCLInterface {
       return "";
     }
     auto device = queue_ptr->sycl_queue().get_device();
-    auto name = device.get_info<cl::sycl::info::device::name>();
-    auto vendor = device.get_info<cl::sycl::info::device::vendor>();
+    auto name = queue_ptr->getDeviceName();
+    auto vendor = queue_ptr->getDeviceVendor();
     auto profile = device.get_info<cl::sycl::info::device::profile>();
 
     std::string type;

@@ -21,10 +21,7 @@ namespace tensorflow {
 
 SYCLAllocator::SYCLAllocator(Eigen::QueueInterface* queue)
     : sycl_device_(new Eigen::SyclDevice(queue)) {
-  cl::sycl::queue& sycl_queue = sycl_device_->sycl_queue();
-  const cl::sycl::device& device = sycl_queue.get_device();
-  stats_.bytes_limit =
-      device.get_info<cl::sycl::info::device::max_mem_alloc_size>();
+  stats_.bytes_limit = sycl_device_->max_buffer_size();
 }
 
 SYCLAllocator::~SYCLAllocator() {

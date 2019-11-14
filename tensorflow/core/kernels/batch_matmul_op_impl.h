@@ -35,6 +35,10 @@ limitations under the License.
 #include "tensorflow/core/platform/stream_executor.h"
 #endif  // GOOGLE_CUDA
 
+#if TENSORFLOW_USE_SYCL
+#include "tensorflow/core/kernels/sycl_blas_utils.h"
+#endif  // TENSORFLOW_USE_SYCL
+
 namespace tensorflow {
 
 typedef Eigen::ThreadPoolDevice CPUDevice;
@@ -496,33 +500,33 @@ struct LaunchBatchMatMul<GPUDevice, Eigen::half> {
 
 #ifdef TENSORFLOW_USE_SYCL
 template <typename Scalar>
-struct ParallelMatMulKernelSYCL {
-  static void Run(const OpKernelContext* context, const Tensor& in_x,
-                  const Tensor& in_y, bool adj_x, bool adj_y, Tensor* out,
-                  int start, int limit) {
-    auto Tx = in_x.tensor<Scalar, 3>();
-    auto Ty = in_y.tensor<Scalar, 3>();
-    auto Tz = out->tensor<Scalar, 3>();
-    Eigen::array<Eigen::IndexPair<Eigen::DenseIndex>, 1> contract_pairs;
-    contract_pairs[0] = ContractionDims(adj_x, adj_y);
-    auto d = context->eigen_sycl_device();
-    for (int i = start; i < limit; ++i) {
-      auto x = Tx.template chip<0>(i);
-      auto y = Ty.template chip<0>(i);
-      auto z = Tz.template chip<0>(i);
-      z.device(d) = x.contract(y, contract_pairs);
-    }
-  }
-};
-
-template <typename Scalar>
 struct LaunchBatchMatMul<SYCLDevice, Scalar> {
   static void Launch(OpKernelContext* context, const Tensor& in_x,
                      const Tensor& in_y, bool adj_x, bool adj_y, Tensor* out) {
-    // Number of matrix multiplies i.e. size of the batch.
-    const int64 batch_size = in_x.dim_size(0);
-    ParallelMatMulKernelSYCL<Scalar>::Run(context, in_x, in_y, adj_x, adj_y,
-                                          out, 0, batch_size);
+    auto& device = context->eigen_sycl_device();
+    SYCLBlasExecutor ex(device.sycl_queue());
+    auto ph = ex.get_policy_handler();
+    auto tx = in_x.tensor<Scalar, 3>();
+    auto ty = in_y.tensor<Scalar, 3>();
+    auto tz = out->tensor<Scalar, 3>();
+    // Tensors' dimensions are already transposed!
+    const auto m = tx.dimension(1 + unsigned(adj_x));
+    const auto k = tx.dimension(2 - unsigned(adj_x));
+    const auto n = ty.dimension(2 - unsigned(adj_y));
+    const auto batch_size = static_cast<decltype(m)>(in_x.dim_size(0));
+    const auto trans_m = n;
+    const auto trans_n = m;
+    const auto ldc = trans_m;
+    const auto lda = adj_y ? k : trans_m;
+    const auto ldb = adj_x ? trans_n : k;
+    const char t_x = adj_y ? 't' : 'n';
+    const char t_y = adj_x ? 't' : 'n';
+    auto lhs_blas_ptr = attach_pointer<Scalar>(device, ph, tx.data());
+    auto rhs_blas_ptr = attach_pointer<Scalar>(device, ph, ty.data());
+    auto out_blas_ptr = attach_pointer<Scalar>(device, ph, tz.data());
+    vlog_blas_params("batch_matmul", trans_m, trans_n, k, t_x, t_y, batch_size);
+    blas::_gemm_batched(ex, t_x, t_y, trans_m, trans_n, k, Scalar(1), rhs_blas_ptr, lda,
+        lhs_blas_ptr, ldb, Scalar(0), out_blas_ptr, ldc, batch_size);
   }
 };
 #endif  // TENSORFLOW_USE_SYCL

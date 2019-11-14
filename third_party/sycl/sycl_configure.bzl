@@ -36,7 +36,7 @@ _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 _TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
 
-_COMPUTECPP_MIN_VERSION = "1.1.0"
+_COMPUTECPP_MIN_VERSION = "1.2.0"
 
 def _optional_get_env(repository_ctx, name, default=None):
   if name in repository_ctx.os.environ:
@@ -191,7 +191,6 @@ def error_sycl_disabled():
       output_licenses = ["unencumbered"],
   )
 """
-
 
 _DUMMY_CROSSTOOL_BUILD_FILE = """
 load("//crosstool:error_sycl_disabled.bzl", "error_sycl_disabled")

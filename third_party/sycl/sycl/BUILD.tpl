@@ -39,33 +39,44 @@ genrule(
     name = "snn_genrule",
     srcs = [
       "@sycl_dnn_archive//:snn_repo",
+      "@sycl_blas_archive//:sycl_blas_headers",
       "@opencl_headers//:OpenCL-Headers",
     ],
-    outs = ["libsycldnn_static.a"],
+    outs = [
+      "libsycldnn_static.a",
+      "include/sycldnn/export.h",
+    ],
     # Below $_ holds the last argument of the previous command,
     # the extra $ is needed for bazel shell cmd.
     # The build directory depends on TARGET_CPU as the host and sycl
     # toolchains are both building SYCL-DNN in parallel.
     # An empty archive is enough for the host.
+    # $(@D) is a bazel variable substitued by the output directory
     cmd = """
           cd external/sycl_dnn_archive &&
           mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
-          if [[ \"$@\" =~ \"host\" ]]; then
+          if [[ \"$(@D)\" =~ \"host\" ]]; then
+            cmake %{SNN_HOST_CMAKE_OPTIONS}% .. > cmake_log
             ar rcs libsycldnn_static.a;
           else
-            rm -rf * &&
-            %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log &&
+            rm -f CMakeCache.txt &&
+            %{SNN_EXPORTS}% cmake %{SNN_HOST_CMAKE_OPTIONS}% %{SNN_CMAKE_OPTIONS}% .. > cmake_log &&
             make sycl_dnn_static > make_log;
           fi &&
-          cp -f libsycldnn_static.a `dirname ../../../$@`
+          cp -f libsycldnn_static.a ../../../$(@D)/ &&
+          mkdir -p ../../../$(@D)/include &&
+          cp -rf sycldnn ../../../$(@D)/include/
     """,
 )
 
 cc_library(
     name = "sycl_dnn",
-    srcs = ["libsycldnn_static.a"],
+    srcs = [":snn_genrule"],
+    hdrs = ["include/sycldnn/export.h"],
+    includes = ["include"],
     deps = [
       "@sycl_dnn_archive//:snn_headers",
+      "@sycl_blas_archive//:sycl_blas_headers",
     ],
     linkstatic = 1,
 )
@@ -74,8 +85,6 @@ cc_library(
 
 cc_library(
     name = "sycl_blas",
-    hdrs = ["include/vptr/virtual_ptr.hpp"],
-    includes = ["include"],
     deps = [
       "@sycl_blas_archive//:sycl_blas_headers",
     ],
