@@ -17,6 +17,9 @@
   * TF_SYCL_USE_HALF: Whether to support half type or not
   * TF_SYCL_USE_DOUBLE: Whether to support double type or not
   * TF_SYCL_USE_LOCAL_MEM: Whether to assume if the device has local memory or not
+  * TF_SYCL_USE_SERIAL_MEMOP: Whether to replace memcpy intrinsics by serial operations in kernels
+  * TF_SYCL_PLATFORM: Enable platform specific optimizations
+  * TF_SYCL_USE_TENSOROPT: Whether to use enable TensorOpt module
 """
 
 _HOST_CXX_COMPILER = "HOST_CXX_COMPILER"
@@ -35,6 +38,7 @@ _TF_SYCL_USE_DOUBLE = "TF_SYCL_USE_DOUBLE"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 _TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
+_TF_SYCL_USE_TENSOROPT = "TF_SYCL_USE_TENSOROPT"
 
 _COMPUTECPP_MIN_VERSION = "1.2.0"
 
@@ -96,6 +100,10 @@ def _check_computecpp_version(repository_ctx, computecpp_path):
   '''
   computecpp_info_cmd = "{}/bin/computecpp_info --dump-version".format(computecpp_path)
   result = repository_ctx.execute(computecpp_info_cmd.split(' '), quiet=True)
+  if result.return_code != 0:
+    fail("Failed to execute '{}', ".format(computecpp_info_cmd) +
+         "check that the path to computecpp_info is correct and " +
+         "that the file is executable on this architecture.")
   current_version = result.stdout.split(' ')[1].strip('\n')
 
   if _to_tuple(current_version) < _to_tuple(_COMPUTECPP_MIN_VERSION):
@@ -218,24 +226,45 @@ def _create_dummy_repository(repository_ctx):
   repository_ctx.file("crosstool/BUILD", _DUMMY_CROSSTOOL_BUILD_FILE)
 
 def _get_dependencies_substitutions(repository_ctx):
+  # sycl_runtime_srcs contains all the SYCL dependencies for genrules using SYCL
+  sycl_runtime_srcs = "glob([\"include/**/*\", \"bin/**/*\", \"lib/**/*\"])"
   snn_exports = []
-  snn_cmake_options = ["-DOpenCL_INCLUDE_DIR=../../opencl_headers/opencl22/"]
+  topt_exports = []
+  cmake_cl_headers = "-DOpenCL_INCLUDE_DIR=../../opencl_headers/opencl22/"
+  snn_host_cmake_options = [cmake_cl_headers]
+  snn_cmake_options = []
+  topt_cmake_options = ["-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON {}".format(cmake_cl_headers)]
   use_computecpp = _enable_compute_cpp(repository_ctx)
   computecpp_root = _find_computecpp_root(repository_ctx) if use_computecpp else ""
   if _crosscompile(repository_ctx):
     gcc_toolchain_path = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN]
     gcc_toolchain_name = repository_ctx.os.environ[_TF_SYCL_CROSS_TOOLCHAIN_NAME]
     platform_name = gcc_toolchain_name[0:gcc_toolchain_name.find('-')]
-    snn_exports.append("export SNN_TOOLCHAIN_DIR={};".format(gcc_toolchain_path))
-    snn_exports.append("export SNN_SYSROOT_DIR={}/{}/libc;".format(gcc_toolchain_path, gcc_toolchain_name))
-    snn_exports.append("export SNN_TARGET_TRIPLE={};".format(gcc_toolchain_name))
-    snn_cmake_options.append("-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc-generic.cmake")
-    snn_cmake_options.append("-DCMAKE_SYSTEM_PROCESSOR={}".format(platform_name))
-    if use_computecpp:
-      snn_cmake_options.append("-DComputeCpp_HOST_DIR={}".format(computecpp_root))
+    for triple in [(snn_exports, snn_cmake_options, "SNN"), (topt_exports, topt_cmake_options, "TENSOROPT")]:
+      exports = triple[0]
+      cmake_options = triple[1]
+      prefix = triple[2]
+      exports.append("export {}_TOOLCHAIN_DIR={};".format(prefix, gcc_toolchain_path))
+      exports.append("export {}_SYSROOT_DIR={}/{}/libc;".format(\
+          prefix, gcc_toolchain_path, gcc_toolchain_name))
+      exports.append("export {}_TARGET_TRIPLE={};".format(prefix, gcc_toolchain_name))
+      cmake_options.append("-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/gcc-generic.cmake")
+      cmake_options.append("-DCMAKE_SYSTEM_PROCESSOR={}".format(platform_name))
+      if use_computecpp:
+        cmake_options.append("-DComputeCpp_HOST_DIR={}".format(computecpp_root))
 
   if use_computecpp:
-    snn_cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
+    # TensorOpt only needs the path to ComputeCpp but won't use the other options
+    topt_cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
+    snn_host_cmake_options.append("-DComputeCpp_DIR={}".format(computecpp_root))
+
+    bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
+    snn_cmake_options.append("-DCOMPUTECPP_BITCODE={}".format(bitcode_target))
+
+    use_serial_memop = _optional_get_env(repository_ctx, _TF_SYCL_USE_SERIAL_MEMOP)
+    serial_memop = "ON" if use_serial_memop == "1" else "OFF"
+    snn_cmake_options.append("-DSNN_COMPUTECPP_USE_SERIAL_MEMOP={}".format(serial_memop))
+
     computecpp_user_flags = ""
     offline_compiler = _optional_get_env(repository_ctx, _TF_SYCL_OFFLINE_COMPILER)
     if offline_compiler:
@@ -247,43 +276,43 @@ def _get_dependencies_substitutions(repository_ctx):
     if computecpp_user_flags:
       snn_cmake_options.append("-DCOMPUTECPP_USER_FLAGS=\"{}\"".format(computecpp_user_flags))
   else:
-    snn_cmake_options.append("-DSNN_TRISYCL=ON")
-  snn_cmake_options.append("-DSNN_BUILD_TESTS=OFF")
-  snn_cmake_options.append("-DSNN_BUILD_BENCHMARKS=OFF")
-  snn_cmake_options.append("-DSNN_BUILD_SAMPLES=OFF")
-  snn_cmake_options.append("-DSNN_BUILD_DOCUMENTATION=OFF")
-  snn_cmake_options.append("-DSNN_CONV2D_DIRECT_STATIC_KERNELS=ON")
-  snn_cmake_options.append("-DCMAKE_EXE_LINKER_FLAGS=-Wl,--enable-new-dtags")
-  snn_cmake_options.append("-DCMAKE_CXX_FLAGS_RELEASE=-O3")
-
-  bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
-  snn_cmake_options.append("-DCOMPUTECPP_BITCODE={}".format(bitcode_target))
+    snn_host_cmake_options.append("-DSNN_TRISYCL=ON")
+  snn_host_cmake_options.append("-DSNN_BUILD_TESTS=OFF")
+  snn_host_cmake_options.append("-DSNN_BUILD_BENCHMARKS=OFF")
+  snn_host_cmake_options.append("-DSNN_BUILD_SAMPLES=OFF")
+  snn_host_cmake_options.append("-DSNN_BUILD_DOCUMENTATION=OFF")
+  snn_host_cmake_options.append("-DSNN_CONV2D_DIRECT_STATIC_KERNELS=ON")
+  snn_host_cmake_options.append("-DCMAKE_EXE_LINKER_FLAGS=-Wl,--enable-new-dtags")
+  snn_host_cmake_options.append("-DCMAKE_CXX_FLAGS_RELEASE=-O3")
+  snn_host_cmake_options.append("-DSNN_DOWNLOAD_SYCLBLAS=OFF")
+  snn_host_cmake_options.append("-DSyclBLAS_DIR=../../sycl_blas_external")
 
   use_half = "ON" if _optional_get_env(repository_ctx, _TF_SYCL_USE_HALF) != "0" else "OFF"
-  snn_cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
+  snn_host_cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
   use_double = "ON" if _optional_get_env(repository_ctx, _TF_SYCL_USE_DOUBLE) != "0" else "OFF"
-  snn_cmake_options.append("-DSNN_ENABLE_DOUBLE={}".format(use_double))
+  snn_host_cmake_options.append("-DSNN_ENABLE_DOUBLE={}".format(use_double))
 
   use_local_mem = _optional_get_env(repository_ctx, _TF_SYCL_USE_LOCAL_MEM)
   local_mem = "ON" if use_local_mem == "1" else "OFF"
   no_local_mem = "ON" if use_local_mem == "0" else "OFF"
-  snn_cmake_options.append("-DSNN_EIGEN_LOCAL_MEM={}".format(local_mem))
-  snn_cmake_options.append("-DSNN_EIGEN_NO_LOCAL_MEM={}".format(no_local_mem))
-
-  use_serial_memop = _optional_get_env(repository_ctx, _TF_SYCL_USE_SERIAL_MEMOP)
-  serial_memop = "ON" if use_serial_memop == "1" else "OFF"
-  snn_cmake_options.append("-DSNN_COMPUTECPP_USE_SERIAL_MEMOP={}".format(serial_memop))
+  snn_host_cmake_options.append("-DSNN_EIGEN_LOCAL_MEM={}".format(local_mem))
+  snn_host_cmake_options.append("-DSNN_EIGEN_NO_LOCAL_MEM={}".format(no_local_mem))
 
   platform = _optional_get_env(repository_ctx, _TF_SYCL_PLATFORM)
   if platform:
-    snn_cmake_options.append("-DCMAKE_CXX_FLAGS=-D{}=1".format(platform))
+    snn_host_cmake_options.append("-DCMAKE_CXX_FLAGS=-D{}=1".format(platform))
 
-  snn_cmake_options.append("-DSNN_DOWNLOAD_SYCLBLAS=OFF")
-  snn_cmake_options.append("-DSyclBLAS_DIR=../../sycl_blas_external")
+  topt_backend_src = "[]"
+  use_tensoropt = _optional_get_env(repository_ctx, _TF_SYCL_USE_TENSOROPT)
 
   return {
+    "%{SYCL_RUNTIME_SRCS}%" : sycl_runtime_srcs,
     "%{SNN_EXPORTS}%" : ' '.join(snn_exports),
-    "%{SNN_CMAKE_OPTIONS}%" : ' '.join(snn_cmake_options)
+    "%{SNN_HOST_CMAKE_OPTIONS}%" : ' '.join(snn_host_cmake_options),
+    "%{SNN_CMAKE_OPTIONS}%" : ' '.join(snn_cmake_options),
+    "%{TOPT_EXPORTS}%" : ' '.join(topt_exports),
+    "%{TOPT_CMAKE_OPTIONS}%" : ' '.join(topt_cmake_options),
+    "%{TOPT_BACKEND_SRC}%" : topt_backend_src,
   }
 
 def _sycl_autoconf_impl(repository_ctx):

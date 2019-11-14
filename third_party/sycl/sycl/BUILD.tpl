@@ -22,6 +22,12 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "using_tensoropt",
+    define_values = {
+        "using_tensoropt": "true",
+    },
+)
 
 cc_library(
     name = "sycl",
@@ -33,11 +39,17 @@ cc_library(
     deps = ["@opencl_headers//:OpenCL-Headers"],
 )
 
+filegroup(
+    name = "sycl_runtime_fg",
+    srcs = %{SYCL_RUNTIME_SRCS}%,
+)
+
 # SYCL-DNN
 
 genrule(
     name = "snn_genrule",
     srcs = [
+      ":sycl_runtime_fg",
       "@sycl_dnn_archive//:snn_repo",
       "@sycl_blas_archive//:sycl_blas_headers",
       "@opencl_headers//:OpenCL-Headers",
@@ -87,5 +99,49 @@ cc_library(
     name = "sycl_blas",
     deps = [
       "@sycl_blas_archive//:sycl_blas_headers",
+    ],
+)
+
+# TensorOpt
+
+filegroup(
+    name = "topt_backend",
+    srcs = %{TOPT_BACKEND_SRC}%,
+)
+
+genrule(
+    name = "topt_genrule",
+    srcs = [
+      ":sycl_runtime_fg",
+      ":topt_backend",
+      "@tensoropt_archive//:topt_repo",
+    ],
+    outs = ["libtensoropt.so"],
+    # Below $_ holds the last argument of the previous command,
+    # the extra $ is needed for bazel shell cmd.
+    # The build directory depends on TARGET_CPU as the host and sycl
+    # toolchains are both building the project in parallel.
+    # An empty archive is enough for the host.
+    # TensorOpt will fail to build if no backend is provided but the rule pass
+    # anyway. If no backend is provided TensorOpt is disabled and
+    # libtensoropt.so won't be used
+    cmd = """
+          cd external/tensoropt_archive &&
+          mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
+          echo "int tensoropt_empty_so = 0;" | gcc -x c++ -shared -o libtensoropt.so - &&
+          if [[ ! \"$@\" =~ \"host\" ]]; then
+            find ! -name 'libtensoropt.so' -type f -exec rm -f {} + &&
+            %{TOPT_EXPORTS}% cmake %{TOPT_CMAKE_OPTIONS}% .. > cmake_log &&
+            make tensoropt > make_log || true;
+          fi &&
+          cp -f libtensoropt.so `dirname ../../../$@`
+    """,
+)
+
+cc_library(
+    name = "tensoropt",
+    srcs = ["libtensoropt.so"],
+    deps = [
+      "@tensoropt_archive//:tensoropt_headers",
     ],
 )

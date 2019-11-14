@@ -494,7 +494,10 @@ OpLevelCostEstimator::ConvolutionDimensionsFromInputs(
     const TensorShapeProto& original_image_shape,
     const TensorShapeProto& original_filter_shape, const OpInfo& op_features,
     bool* found_unknown_shapes) {
+#ifndef TF_SYCL_USE_TENSOROPT
+  // This log is too verbose if TensorOpt is enabled
   VLOG(2) << "op features: " << op_features.DebugString();
+#endif
   VLOG(2) << "Original image shape: " << original_image_shape.DebugString();
   VLOG(2) << "Original filter shape: " << original_filter_shape.DebugString();
   auto image_shape =

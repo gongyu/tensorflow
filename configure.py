@@ -1444,6 +1444,13 @@ def set_sycl_extra_options(environ_cp):
   if not use_serial_memop:
     write_to_bazelrc('build:sycl --cxxopt=-no-serial-memop')
 
+  default_use_topt = 0
+  use_tensoropt = int(environ_cp.get('TF_SYCL_USE_TENSOROPT', default_use_topt))
+  write_action_env_to_bazelrc('TF_SYCL_USE_TENSOROPT', use_tensoropt)
+  if use_tensoropt:
+    write_to_bazelrc('build:sycl --cxxopt=-DTF_SYCL_USE_TENSOROPT=1')
+    write_to_bazelrc('build:sycl --define using_tensoropt=true')
+
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""
 

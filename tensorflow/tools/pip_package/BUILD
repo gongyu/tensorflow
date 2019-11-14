@@ -13,6 +13,7 @@ load("//third_party/mkl:build_defs.bzl", "if_mkl")
 load("//third_party/acl:build_defs.bzl", "if_acl")
 load("//tensorflow:tensorflow.bzl", "if_cuda")
 load("//tensorflow:tensorflow.bzl", "if_sycl")
+load("@local_config_sycl//sycl:build_defs.bzl", "if_tensoropt")
 load("@local_config_tensorrt//:build_defs.bzl", "if_tensorrt")
 load("//tensorflow/core:platform/default/build_config_root.bzl", "tf_additional_license_deps")
 
@@ -182,8 +183,12 @@ sh_binary(
 #"//tensorflow/contrib/lite/python:tflite_convert",
 #"//tensorflow/contrib/lite/toco/python:toco_from_protos",
         ],
-    }) + if_mkl(["//third_party/mkl:intel_binary_blob"]) + if_tensorrt([
+    }) + if_mkl([
+        "//third_party/mkl:intel_binary_blob"
+    ]) + if_tensorrt([
         "//tensorflow/contrib/tensorrt:init_py",
+    ]) + if_tensoropt([
+        "//tensorflow/contrib/tensoropt:init_py",
     ]) + if_acl(["//third_party/acl:intel_binary_blob"]),
 )
 

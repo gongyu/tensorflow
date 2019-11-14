@@ -27,7 +27,7 @@ function cp_external() {
 
   pushd .
   cd "$src_dir"
-  for f in `find . ! -type d ! -name '*.py' ! -path '*local_config_cuda*' ! -path '*local_config_tensorrt*' ! -path '*org_tensorflow*'`; do
+  for f in `find . ! -type d ! -name '*.py' ! -path '*local_config_cuda*' ! -path '*local_config_tensorrt*' ! -path '*local_config_tensoropt*' ! -path '*org_tensorflow*'`; do
     mkdir -p "${dest_dir}/$(dirname ${f})"
     cp "${f}" "${dest_dir}/$(dirname ${f})/"
   done
@@ -113,6 +113,16 @@ function prepare_src() {
           mkdir "${TMPDIR}/${so_lib_dir}"
           cp -R ${RUNFILES}/${so_lib_dir}/${mkl_so_dir} "${TMPDIR}/${so_lib_dir}"
         fi
+      fi
+    fi
+    # Copy TensorOpt libs over so they can be loaded at runtime
+    so_lib_dir=$(ls $RUNFILES | grep solib) || true
+    if [ -n "${so_lib_dir}" ]; then
+      rt_so_dir=$(dirname `find -L ${RUNFILES}/${so_lib_dir} -type f -name "libtensoropt.so"`) || true
+      if [ -n "${rt_so_dir}" ]; then
+        echo "Found dir ${rt_so_dir}"
+        mkdir -p "${TMPDIR}/${so_lib_dir}"
+        cp -R ${rt_so_dir} "${TMPDIR}/${so_lib_dir}"
       fi
     fi
     mkdir "${TMPDIR}/tensorflow/aux-bin"

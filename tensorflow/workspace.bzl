@@ -126,6 +126,18 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
       build_file = clean_dep("//third_party/sycl:sycl_blas.BUILD"),
   )
 
+  # TensorOpt repository is not available yet
+  tf_http_archive(
+      name = "tensoropt_archive",
+      urls = [
+          "https://mirror.bazel.build/github.com/codeplaysoftware/computecpp-sdk/archive/c5e2f98b97a6873c57cf48d7a53297ed290964bd.tar.gz",
+          "https://github.com/codeplaysoftware/computecpp-sdk/archive/c5e2f98b97a6873c57cf48d7a53297ed290964bd.tar.gz",
+      ],
+      sha256 = "",
+      strip_prefix = "computecpp-sdk-c5e2f98b97a6873c57cf48d7a53297ed290964bd",
+      build_file = clean_dep("//third_party/sycl:tensoropt.BUILD"),
+  )
+
   tf_http_archive(
       name = "com_google_absl",
       urls = [
