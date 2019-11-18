@@ -505,17 +505,15 @@ struct LaunchDepthwiseConvOp<SYCLDevice, T> {
     vlog_depthwise_params(sd_params, data_format, "forward_depthwise_conv2d");
 
     auto device = ctx->template eigen_device<SYCLDevice>();
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    input = attach_pointer<T>(device, ph, input);
-    depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
-    output = attach_pointer<T>(device, ph, output);
-#endif
-    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::Forward>(input,
-        depthwise_filter, output, sd_params, backend);
-    if (status.status != sycldnn::StatusCode::OK) {
-      ctx->SetStatus(get_sd_err_msg(status));
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, input);
+    auto sd_fil = get_sycl_dnn_input<T>(device, depthwise_filter);
+    auto sd_out = get_sycl_dnn_input<T>(device, output);
+    sycldnn::SNNStatus sd_status =
+        sd::launch<T, sycldnn::conv2d::conv_type::Forward>(sd_in, sd_fil, sd_out,
+            sd_params, sd_backend);
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();
@@ -537,17 +535,15 @@ struct LaunchDepthwiseConvBackpropInputOp<SYCLDevice, T> {
     vlog_depthwise_params(sd_params, data_format, "input_backprop_depthwise_conv2d");
 
     auto device = ctx->template eigen_device<SYCLDevice>();
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    out_backprop = attach_pointer<T>(device, ph, out_backprop);
-    depthwise_filter = attach_pointer<T>(device, ph, depthwise_filter);
-    in_backprop = attach_pointer<T>(device, ph, in_backprop);
-#endif
-    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
-        out_backprop, depthwise_filter, in_backprop, sd_params, backend);
-    if (status.status != sycldnn::StatusCode::OK) {
-      ctx->SetStatus(get_sd_err_msg(status));
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_backprop);
+    auto sd_fil = get_sycl_dnn_input<T>(device, depthwise_filter);
+    auto sd_in = get_sycl_dnn_input<T>(device, in_backprop);
+    sycldnn::SNNStatus sd_status =
+        sd::launch<T, sycldnn::conv2d::conv_type::InputBackprop>(
+            sd_out, sd_fil, sd_in, sd_params, sd_backend);
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();
@@ -569,17 +565,15 @@ struct LaunchDepthwiseConvBackpropFilterOp<SYCLDevice, T> {
     vlog_depthwise_params(sd_params, data_format, "filter_backprop_depthwise_conv2d");
 
     auto device = ctx->template eigen_device<SYCLDevice>();
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    input = attach_pointer<T>(device, ph, input);
-    out_backprop = attach_pointer<T>(device, ph, out_backprop);
-    filter_backprop = attach_pointer<T>(device, ph, filter_backprop);
-#endif
-    sycldnn::SNNStatus status = sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
-        input, out_backprop, filter_backprop, sd_params, backend);
-    if (status.status != sycldnn::StatusCode::OK) {
-      ctx->SetStatus(get_sd_err_msg(status));
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, input);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_backprop);
+    auto sd_fil = get_sycl_dnn_input<T>(device, filter_backprop);
+    sycldnn::SNNStatus sd_status =
+        sd::launch<T, sycldnn::conv2d::conv_type::FilterBackprop>(
+            sd_in, sd_out, sd_fil, sd_params, sd_backend);
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      ctx->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();

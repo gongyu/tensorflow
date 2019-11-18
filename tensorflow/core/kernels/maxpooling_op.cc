@@ -1543,22 +1543,19 @@ class MaxPoolingOp<SYCLDevice, T> : public OpKernel {
     auto out_t = output->template flat<T>();
     auto in_ptr = in_t.data();
     auto out_ptr = out_t.data();
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    in_ptr = attach_pointer<T>(device, ph, in_ptr);
-    out_ptr = attach_pointer<T>(device, ph, out_ptr);
-#endif
-    sycldnn::SNNStatus status;
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, in_ptr);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_ptr);
+    sycldnn::SNNStatus sd_status;
     if (propagate_nans_) {
-      status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
-          sd_params, backend);
+      sd_status = sd::launch<T, sd::MaxWithNan, sd::Forward>(sd_in, sd_out,
+          sd_params, sd_backend);
     } else {
-      status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
-          sd_params, backend);
+      sd_status = sd::launch<T, sd::Max, sd::Forward>(sd_in, sd_out,
+          sd_params, sd_backend);
     }
-    if (status.status != sycldnn::StatusCode::OK) {
-      context->SetStatus(get_sd_err_msg(status));
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();
@@ -1658,22 +1655,19 @@ class MaxPoolingV2Op<SYCLDevice, T> : public OpKernel {
     auto out_t = output->template flat<T>();
     auto in_ptr = in_t.data();
     auto out_ptr = out_t.data();
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    in_ptr = attach_pointer<T>(device, ph, in_ptr);
-    out_ptr = attach_pointer<T>(device, ph, out_ptr);
-#endif
-    sycldnn::SNNStatus status;
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, in_ptr);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_ptr);
+    sycldnn::SNNStatus sd_status;
     if (propagate_nans_) {
-      status = sd::launch<T, sd::MaxWithNan, sd::Forward>(in_ptr, out_ptr,
-          sd_params, backend);
+      sd_status = sd::launch<T, sd::MaxWithNan, sd::Forward>(sd_in, sd_out,
+          sd_params, sd_backend);
     } else {
-      status = sd::launch<T, sd::Max, sd::Forward>(in_ptr, out_ptr,
-          sd_params, backend);
+      sd_status = sd::launch<T, sd::Max, sd::Forward>(sd_in, sd_out,
+          sd_params, sd_backend);
     }
-    if (status.status != sycldnn::StatusCode::OK) {
-      context->SetStatus(get_sd_err_msg(status));
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();
@@ -1799,24 +1793,21 @@ class MaxPoolingGradOp<SYCLDevice, T> : public OpKernel {
     auto backprop_ptr = backprop_t.data();
     auto out_ptr = out_t.data();
 
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    in_data_ptr = attach_pointer<T>(device, ph, in_data_ptr);
-    out_data_ptr = attach_pointer<T>(device, ph, out_data_ptr);
-    backprop_ptr = attach_pointer<T>(device, ph, backprop_ptr);
-    out_ptr = attach_pointer<T>(device, ph, out_ptr);
-#endif
-    sycldnn::SNNStatus status;
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in_data = get_sycl_dnn_input<T>(device, in_data_ptr);
+    auto sd_out_data = get_sycl_dnn_input<T>(device, out_data_ptr);
+    auto sd_backprop = get_sycl_dnn_input<T>(device, backprop_ptr);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_ptr);
+    sycldnn::SNNStatus sd_status;
     if (propagate_nans_) {
-      status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(in_data_ptr,
-          out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+      sd_status = sd::launch<T, sd::MaxWithNan, sd::Backpropagate>(sd_in_data,
+          sd_out_data, sd_backprop, sd_out, sd_params, sd_backend);
     } else {
-      status = sd::launch<T, sd::Max, sd::Backpropagate>(in_data_ptr,
-          out_data_ptr, backprop_ptr, out_ptr, sd_params, backend);
+      sd_status = sd::launch<T, sd::Max, sd::Backpropagate>(sd_in_data,
+          sd_out_data, sd_backprop, sd_out, sd_params, sd_backend);
     }
-    if (status.status != sycldnn::StatusCode::OK) {
-      context->SetStatus(get_sd_err_msg(status));
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();

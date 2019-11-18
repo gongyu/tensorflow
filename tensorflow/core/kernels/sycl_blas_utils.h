@@ -59,7 +59,7 @@ using SYCLBlasExecutor = blas::Executor<SYCLBlasPolicy>;
 
 template <class T>
 inline blas::BufferIterator<T, blas::codeplay_policy>
-    attach_pointer(const Eigen::SyclDevice& d, const T* ptr) {
+    get_buffer_iterator(const Eigen::SyclDevice& d, const T* ptr) {
   auto original_buffer = d.get_sycl_buffer(ptr);
   auto offset = d.get_offset(ptr);
   auto buffer = original_buffer.template reinterpret<T>(

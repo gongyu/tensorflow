@@ -443,7 +443,6 @@ struct LaunchMatMul<SYCLDevice, T, USE_CUBLAS> {
       std::vector<AlgorithmType>*, bool, Tensor* out) {
     auto& device = ctx->eigen_sycl_device();
     SYCLBlasExecutor ex(device.sycl_queue());
-    auto ph = ex.get_policy_handler();
     auto ta = a.matrix<T>();
     auto tb = b.matrix<T>();
     auto tc = out->matrix<T>();
@@ -460,9 +459,9 @@ struct LaunchMatMul<SYCLDevice, T, USE_CUBLAS> {
     const auto ldb = transpose_a ? trans_n : k;
     const auto t_x = transpose_b ? 't' : 'n';
     const auto t_y = transpose_a ? 't' : 'n';
-    auto lhs_blas_ptr = attach_pointer<T>(device, ph, ta.data());
-    auto rhs_blas_ptr = attach_pointer<T>(device, ph, tb.data());
-    auto out_blas_ptr = attach_pointer<T>(device, ph, tc.data());
+    auto lhs_blas_ptr = get_buffer_iterator<T>(device, ta.data());
+    auto rhs_blas_ptr = get_buffer_iterator<T>(device, tb.data());
+    auto out_blas_ptr = get_buffer_iterator<T>(device, tc.data());
     vlog_blas_params("matmul", trans_m, trans_n, k, t_x, t_y);
     blas::_gemm(ex, t_x, t_y, trans_m, trans_n, k, T(1), rhs_blas_ptr, lda,
                 lhs_blas_ptr, ldb, T(0), out_blas_ptr, ldc);

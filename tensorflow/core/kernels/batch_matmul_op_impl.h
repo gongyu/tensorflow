@@ -505,7 +505,6 @@ struct LaunchBatchMatMul<SYCLDevice, Scalar> {
                      const Tensor& in_y, bool adj_x, bool adj_y, Tensor* out) {
     auto& device = context->eigen_sycl_device();
     SYCLBlasExecutor ex(device.sycl_queue());
-    auto ph = ex.get_policy_handler();
     auto tx = in_x.tensor<Scalar, 3>();
     auto ty = in_y.tensor<Scalar, 3>();
     auto tz = out->tensor<Scalar, 3>();
@@ -521,9 +520,9 @@ struct LaunchBatchMatMul<SYCLDevice, Scalar> {
     const auto ldb = adj_x ? trans_n : k;
     const char t_x = adj_y ? 't' : 'n';
     const char t_y = adj_x ? 't' : 'n';
-    auto lhs_blas_ptr = attach_pointer<Scalar>(device, ph, tx.data());
-    auto rhs_blas_ptr = attach_pointer<Scalar>(device, ph, ty.data());
-    auto out_blas_ptr = attach_pointer<Scalar>(device, ph, tz.data());
+    auto lhs_blas_ptr = get_buffer_iterator<Scalar>(device, tx.data());
+    auto rhs_blas_ptr = get_buffer_iterator<Scalar>(device, ty.data());
+    auto out_blas_ptr = get_buffer_iterator<Scalar>(device, tz.data());
     vlog_blas_params("batch_matmul", trans_m, trans_n, k, t_x, t_y, batch_size);
     blas::_gemm_batched(ex, t_x, t_y, trans_m, trans_n, k, Scalar(1), rhs_blas_ptr, lda,
         lhs_blas_ptr, ldb, Scalar(0), out_blas_ptr, ldc, batch_size);

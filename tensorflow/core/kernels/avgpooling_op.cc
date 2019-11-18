@@ -366,21 +366,16 @@ class AvgPoolingOp<SYCLDevice, T> : public UnaryOp<T> {
       return;
 
     auto device = context->eigen_device<SYCLDevice>();
-    auto in_t = tensor_in.template flat<T>();
-    auto out_t = output->template flat<T>();
-    auto in_ptr = in_t.data();
-    auto out_ptr = out_t.data();
+    auto in_ptr = tensor_in.template flat<T>().data();
+    auto out_ptr = output->template flat<T>().data();
     vlog_pooling_params(sd_params, "forward_avgpooling");
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    in_ptr = attach_pointer<T>(device, ph, in_ptr);
-    out_ptr = attach_pointer<T>(device, ph, out_ptr);
-#endif
-    sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Forward>(in_ptr, out_ptr,
-        sd_params, backend);
-    if (status.status != sycldnn::StatusCode::OK) {
-      context->SetStatus(get_sd_err_msg(status));
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, in_ptr);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_ptr);
+    sycldnn::SNNStatus sd_status = sd::launch<T, sd::Average, sd::Forward>(
+        sd_in, sd_out, sd_params, sd_backend);
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();
@@ -944,21 +939,16 @@ class AvgPoolingGradOp<SYCLDevice, T> : public OpKernel {
       return;
 
     auto device = context->eigen_device<SYCLDevice>();
-    auto in_t = out_backprop.template flat<T>();
-    auto out_t = output->template flat<T>();
-    auto in_ptr = in_t.data();
-    auto out_ptr = out_t.data();
+    auto in_ptr = out_backprop.template flat<T>().data();
+    auto out_ptr = output->template flat<T>().data();
     vlog_pooling_params(sd_params, "backprop_avgpooling");
-    CREATE_SNN_BACKEND(backend, device);
-#ifdef SYCL_SNN_USE_BLAS_BACKEND
-    auto ph = backend.get_executor().get_policy_handler();
-    in_ptr = attach_pointer<T>(device, ph, in_ptr);
-    out_ptr = attach_pointer<T>(device, ph, out_ptr);
-#endif
-    sycldnn::SNNStatus status = sd::launch<T, sd::Average, sd::Backpropagate>(in_ptr, out_ptr,
-        sd_params, backend);
-    if (status.status != sycldnn::StatusCode::OK) {
-      context->SetStatus(get_sd_err_msg(status));
+    CREATE_SNN_BACKEND(sd_backend, device);
+    auto sd_in = get_sycl_dnn_input<T>(device, in_ptr);
+    auto sd_out = get_sycl_dnn_input<T>(device, out_ptr);
+    sycldnn::SNNStatus sd_status = sd::launch<T, sd::Average, sd::Backpropagate>(
+        sd_in, sd_out, sd_params, sd_backend);
+    if (sd_status.status != sycldnn::StatusCode::OK) {
+      context->SetStatus(get_sd_err_msg(sd_status));
       return;
     }
     device.async_synchronize();

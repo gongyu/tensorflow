@@ -42,9 +42,25 @@ namespace tensorflow {
 #if defined(SYCL_SNN_USE_EIGEN_BACKEND)
 #define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
   sycldnn::backend::EigenBackend BACKEND(DEVICE)
+
+template <class T>
+inline T* get_sycl_dnn_input(const Eigen::SyclDevice&, T* ptr) {
+  return ptr;
+}
+
+template <class T>
+inline const T* get_sycl_dnn_input(const Eigen::SyclDevice&, const T* ptr) {
+  return ptr;
+}
 #else
 #define CREATE_SNN_BACKEND(BACKEND, DEVICE) \
   sycldnn::backend::SyclBLASBackend BACKEND(DEVICE.sycl_queue())
+
+template <class T>
+inline blas::BufferIterator<T, blas::codeplay_policy>
+    get_sycl_dnn_input(const Eigen::SyclDevice& device, const T* ptr) {
+  return get_buffer_iterator<T>(device, ptr);
+}
 #endif
 
 template <class SDStatus>
