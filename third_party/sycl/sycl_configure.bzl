@@ -14,8 +14,8 @@
   * TF_SYCL_OFFLINE_COMPILER_ARGS: Optional OpenCL offline compiler arguments
   * TF_SYCL_CROSS_TOOLCHAIN: The path to the toolchain (only if cross-compiling)
   * TF_SYCL_CROSS_TOOLCHAIN_NAME: The name of the toolchain (only if cross-compiling)
-  * TF_USE_HALF_SYCL: Whether to support half type or not
-  * TF_USE_DOUBLE_SYCL: Whether to support double type or not
+  * TF_SYCL_USE_HALF: Whether to support half type or not
+  * TF_SYCL_USE_DOUBLE: Whether to support double type or not
   * TF_SYCL_USE_LOCAL_MEM: Whether to assume if the device has local memory or not
 """
 
@@ -30,8 +30,8 @@ _TF_SYCL_OFFLINE_COMPILER = "TF_SYCL_OFFLINE_COMPILER"
 _TF_SYCL_OFFLINE_COMPILER_ARGS = "TF_SYCL_OFFLINE_COMPILER_ARGS"
 _TF_SYCL_CROSS_TOOLCHAIN = "TF_SYCL_CROSS_TOOLCHAIN"
 _TF_SYCL_CROSS_TOOLCHAIN_NAME = "TF_SYCL_CROSS_TOOLCHAIN_NAME"
-_TF_USE_HALF_SYCL = "TF_USE_HALF_SYCL"
-_TF_USE_DOUBLE_SYCL = "TF_USE_DOUBLE_SYCL"
+_TF_SYCL_USE_HALF = "TF_SYCL_USE_HALF"
+_TF_SYCL_USE_DOUBLE = "TF_SYCL_USE_DOUBLE"
 _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 _TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
@@ -260,9 +260,9 @@ def _get_dependencies_substitutions(repository_ctx):
   bitcode_target = repository_ctx.os.environ[_TF_SYCL_BITCODE_TARGET]
   snn_cmake_options.append("-DCOMPUTECPP_BITCODE={}".format(bitcode_target))
 
-  use_half = "ON" if _optional_get_env(repository_ctx, _TF_USE_HALF_SYCL) != "0" else "OFF"
+  use_half = "ON" if _optional_get_env(repository_ctx, _TF_SYCL_USE_HALF) != "0" else "OFF"
   snn_cmake_options.append("-DSNN_ENABLE_HALF={}".format(use_half))
-  use_double = "ON" if _optional_get_env(repository_ctx, _TF_USE_DOUBLE_SYCL) != "0" else "OFF"
+  use_double = "ON" if _optional_get_env(repository_ctx, _TF_SYCL_USE_DOUBLE) != "0" else "OFF"
   snn_cmake_options.append("-DSNN_ENABLE_DOUBLE={}".format(use_double))
 
   use_local_mem = _optional_get_env(repository_ctx, _TF_SYCL_USE_LOCAL_MEM)

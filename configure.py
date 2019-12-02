@@ -1365,15 +1365,15 @@ def set_sycl_extra_options(environ_cp):
   """Set which data types are enabled for the SYCL configuration."""
   #TODO(codeplay): Add support for half
   #use_half = int(
-  #    get_var(environ_cp, 'TF_USE_HALF_SYCL', 'half types in SYCL', False))
+  #    get_var(environ_cp, 'TF_SYCL_USE_HALF', 'half types in SYCL', False))
   use_half = 0
-  write_action_env_to_bazelrc('TF_USE_HALF_SYCL', use_half)
+  write_action_env_to_bazelrc('TF_SYCL_USE_HALF', use_half)
   if use_half == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_HALF=1')
 
   use_double = int(
-      get_var(environ_cp, 'TF_USE_DOUBLE_SYCL', 'double types in SYCL', True))
-  write_action_env_to_bazelrc('TF_USE_DOUBLE_SYCL', use_double)
+      get_var(environ_cp, 'TF_SYCL_USE_DOUBLE', 'double types in SYCL', True))
+  write_action_env_to_bazelrc('TF_SYCL_USE_DOUBLE', use_double)
   if use_double == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
 
