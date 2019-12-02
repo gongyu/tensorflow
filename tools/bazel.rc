@@ -56,11 +56,11 @@ build:sycl_asan --copt -fno-omit-frame-pointer --copt -fsanitize-coverage=3
 build:sycl_asan --copt -DGPR_NO_DIRECT_SYSCALLS
 build:sycl_asan --linkopt -fsanitize=address
 
-# This configuration is for a cross-build by default.
-# For a native build on ARM, specify --cpu=arm on the command line.
+# This configuration is for a cross-build on an ARM architecture.
+# A native build on ARM requires the --cpu=arm flag which is already set
+# by specifying the ARM_GPU preset
 build:sycl_arm --config=sycl
 build:sycl_arm --cpu=armeabi
-build:sycl_arm --copt=-DARM_NON_MOBILE
 
 build --define=use_fast_cpp_protos=true
 build --define=allow_oversize_protos=true

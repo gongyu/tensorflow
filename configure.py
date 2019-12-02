@@ -1361,8 +1361,59 @@ def set_trisycl_include_dir(environ_cp):
                               trisycl_include_dir)
   write_to_bazelrc('build:sycl --define using_trisycl=true')
 
+def set_env_var_if_unset(environ_cp, name, value):
+  if name not in environ_cp:
+    environ_cp[name] = value
+
 def set_sycl_extra_options(environ_cp):
-  """Set which data types are enabled for the SYCL configuration."""
+  """Set options related to SYCL if enabled."""
+  # Presets are a set of options that have been tested for specific
+  # configurations. They can be overwritten by the user.
+  ALL_PRESETS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU']
+  while True:
+    preset = get_from_env_or_user_or_default(environ_cp, 'TF_SYCL_PRESET',
+        'Specify a preset of options optimized for a specific configuration '
+        'among {}, if unsure leave empty:'.format(ALL_PRESETS), '')
+    if preset and preset not in ALL_PRESETS:
+      print('Unsupported preset: {}'.format(preset))
+      print('Possible values are: {}'.format(ALL_PRESETS))
+      environ_cp['TF_SYCL_PRESET'] = ''
+    else:
+      break
+  set_env_var_if_unset(environ_cp, 'TF_SYCL_PLATFORM', preset)
+  if preset == 'AMD_GPU':
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_BITCODE_TARGET', 'spir64')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_HALF', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_DOUBLE', '1')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_LOCAL_MEM', '1')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '0')
+  elif preset == 'INTEL_GPU':
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_BITCODE_TARGET', 'spir64')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_HALF', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_DOUBLE', '1')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_LOCAL_MEM', '1')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '0')
+  elif preset == 'ARM_GPU':
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_BITCODE_TARGET', 'spirv64')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_HALF', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_DOUBLE', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_LOCAL_MEM', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '1')
+    write_to_bazelrc('build:sycl --cpu=arm')
+    write_to_bazelrc('build:sycl --copt=-DARM_NON_MOBILE')
+
+  # Platforms are a compile time option that affect which kernel to choose for
+  # expensive operations such as convolutions and matrix multiplication.
+  ALL_PLATFORMS = ALL_PRESETS
+  platform = environ_cp.get('TF_SYCL_PLATFORM', '')
+  if platform:
+    if platform not in ALL_PLATFORMS:
+      raise UserInputError('Unsupported TF_SYCL_PLATFORM {}'.format(platform) +
+                           ', possible values are {}'.format(ALL_PLATFORMS))
+    else:
+      write_to_bazelrc('build:sycl --copt=-D{}=1'.format(platform))
+  write_action_env_to_bazelrc('TF_SYCL_PLATFORM', platform)
+
   #TODO(codeplay): Add support for half
   #use_half = int(
   #    get_var(environ_cp, 'TF_SYCL_USE_HALF', 'half types in SYCL', False))
@@ -1376,21 +1427,6 @@ def set_sycl_extra_options(environ_cp):
   write_action_env_to_bazelrc('TF_SYCL_USE_DOUBLE', use_double)
   if use_double == 0:
     write_to_bazelrc('build:sycl --cxxopt=-DTENSORFLOW_SYCL_NO_DOUBLE=1')
-
-  ALL_PLATFORMS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU']
-  while True:
-    platform = get_from_env_or_user_or_default(environ_cp, 'TF_SYCL_PLATFORM', 'Specify the platform you are compiling for if you know it to enable compile time optimizations, otherwise leave empty:', '')
-    write_action_env_to_bazelrc('TF_SYCL_PLATFORM', platform)
-    if platform:
-      if platform not in ALL_PLATFORMS:
-        print('Unsupported platform: {}'.format(platform))
-        print('Possible values are: {}'.format(ALL_PLATFORMS))
-        environ_cp['TF_SYCL_PLATFORM']= ''
-      else:
-        write_to_bazelrc('build:sycl --copt=-D{}=1'.format(platform))
-        break
-    else:
-      break
 
   # No need to ask for another question regarding LOCAL_MEM,
   # setting this environment variable to 0 or 1 can improve performances
