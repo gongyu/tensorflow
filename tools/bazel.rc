@@ -50,6 +50,7 @@ build:sycl --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:sycl --define=using_sycl=true
 build:sycl --copt -DEIGEN_SYCL_USE_DEFAULT_SELECTOR=1
 build:sycl --copt -DEIGEN_SYCL_DISABLE_SKINNY=1
+build:sycl --copt -DEIGEN_SYCL_ASYNC_EXECUTION=1
 
 build:sycl_asan --config=sycl
 build:sycl_asan --copt -fno-omit-frame-pointer --copt -fsanitize-coverage=3
