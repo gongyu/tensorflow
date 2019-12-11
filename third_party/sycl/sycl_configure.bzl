@@ -20,6 +20,7 @@
   * TF_SYCL_USE_SERIAL_MEMOP: Whether to replace memcpy intrinsics by serial operations in kernels
   * TF_SYCL_PLATFORM: Enable platform specific optimizations
   * TF_SYCL_USE_TENSOROPT: Whether to use enable TensorOpt module
+  * TF_SYCL_IMGDNN_DIR: Path to IMGDNN root, set IMGDNN as the TensorOpt backend if enabled
 """
 
 _HOST_CXX_COMPILER = "HOST_CXX_COMPILER"
@@ -39,6 +40,7 @@ _TF_SYCL_USE_LOCAL_MEM = "TF_SYCL_USE_LOCAL_MEM"
 _TF_SYCL_USE_SERIAL_MEMOP = "TF_SYCL_USE_SERIAL_MEMOP"
 _TF_SYCL_PLATFORM = "TF_SYCL_PLATFORM"
 _TF_SYCL_USE_TENSOROPT = "TF_SYCL_USE_TENSOROPT"
+_TF_SYCL_IMGDNN_DIR = "TF_SYCL_IMGDNN_DIR"
 
 _COMPUTECPP_MIN_VERSION = "1.2.0"
 
@@ -302,6 +304,14 @@ def _get_dependencies_substitutions(repository_ctx):
 
   topt_backend_src = "[]"
   use_tensoropt = _optional_get_env(repository_ctx, _TF_SYCL_USE_TENSOROPT)
+  imgdnn_dir = _optional_get_env(repository_ctx, _TF_SYCL_IMGDNN_DIR)
+  if imgdnn_dir and use_tensoropt == "1":
+    _check_dir(repository_ctx, imgdnn_dir)
+    _check_lib(repository_ctx, imgdnn_dir + "/lib/libIMGDNN.so")
+    _symlink_dir(repository_ctx, imgdnn_dir, "sycl/imgdnn")
+    topt_cmake_options.append("-DTENSOROPT_BACKEND=IMGDNN".format(imgdnn_dir))
+    topt_cmake_options.append("-DIMGDNN_DIR={}".format(imgdnn_dir))
+    topt_backend_src = "glob([\"imgdnn/**/*.h\"]) + [\"imgdnn/lib/libIMGDNN.so\"]"
 
   return {
     "%{SNN_EXPORTS}%" : ' '.join(snn_exports),

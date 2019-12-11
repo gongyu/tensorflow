@@ -1377,7 +1377,7 @@ def set_sycl_extra_options(environ_cp):
 
   # Presets are a set of options that have been tested for specific
   # configurations. They can be overwritten by the user.
-  ALL_PRESETS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU']
+  ALL_PRESETS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU', 'POWER_VR']
   while True:
     preset = get_from_env_or_user_or_default(environ_cp, 'TF_SYCL_PRESET',
         'Specify a preset of options optimized for a specific configuration '
@@ -1410,6 +1410,13 @@ def set_sycl_extra_options(environ_cp):
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '1')
     write_to_bazelrc('build:sycl --copt=-DARM_NON_MOBILE')
     write_to_bazelrc('build:sycl --copt=-DEIGEN_DONT_VECTORIZE_SYCL')
+    is_arm_cpu = True
+  elif preset == 'POWER_VR':
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_BITCODE_TARGET', 'spir64')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_HALF', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_DOUBLE', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_LOCAL_MEM', '0')
+    set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '0')
     is_arm_cpu = True
 
   if is_arm_cpu:
@@ -1459,10 +1466,15 @@ def set_sycl_extra_options(environ_cp):
   if not use_serial_memop:
     write_to_bazelrc('build:sycl --cxxopt=-no-serial-memop')
 
-  default_use_topt = 0
+  imgdnn_dir = environ_cp.get('TF_SYCL_IMGDNN_DIR', '')
+  write_action_env_to_bazelrc('TF_SYCL_IMGDNN_DIR', imgdnn_dir)
+  default_use_topt = imgdnn_dir != ''
   use_tensoropt = int(environ_cp.get('TF_SYCL_USE_TENSOROPT', default_use_topt))
   write_action_env_to_bazelrc('TF_SYCL_USE_TENSOROPT', use_tensoropt)
   if use_tensoropt:
+    if not imgdnn_dir:
+        raise UserInputError('Path to IMGDNN must be provided with ' +
+                             'TF_SYCL_IMGDNN_DIR in order to enable TensorOpt.')
     write_to_bazelrc('build:sycl --cxxopt=-DTF_SYCL_USE_TENSOROPT=1')
     write_to_bazelrc('build:sycl --define using_tensoropt=true')
 
