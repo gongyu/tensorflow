@@ -1223,7 +1223,7 @@ def set_tf_cuda_compute_capabilities(environ_cp):
     # Check whether all capabilities from the input is valid
     all_valid = True
     # Remove all whitespace characters before splitting the string
-    # that users may insert by accident, as this will result in error 
+    # that users may insert by accident, as this will result in error
     tf_cuda_compute_capabilities = ''.join(tf_cuda_compute_capabilities.split())
     for compute_capability in tf_cuda_compute_capabilities.split(','):
       m = re.match('[0-9]+.[0-9]+', compute_capability)
@@ -1443,6 +1443,14 @@ def set_sycl_extra_options(environ_cp):
   write_action_env_to_bazelrc('TF_SYCL_USE_SERIAL_MEMOP', use_serial_memop)
   if not use_serial_memop:
     write_to_bazelrc('build:sycl --cxxopt=-no-serial-memop')
+
+  # Cross-compiling environment variables
+  cross_toolchain = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN', '')
+  if cross_toolchain:
+    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN', cross_toolchain)
+  cross_toolchain_name = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN_NAME', '')
+  if cross_toolchain_name:
+    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN_NAME', cross_toolchain_name)
 
   default_use_topt = 0
   use_tensoropt = int(environ_cp.get('TF_SYCL_USE_TENSOROPT', default_use_topt))
