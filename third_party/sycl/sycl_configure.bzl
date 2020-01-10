@@ -226,8 +226,6 @@ def _create_dummy_repository(repository_ctx):
   repository_ctx.file("crosstool/BUILD", _DUMMY_CROSSTOOL_BUILD_FILE)
 
 def _get_dependencies_substitutions(repository_ctx):
-  # sycl_runtime_srcs contains all the SYCL dependencies for genrules using SYCL
-  sycl_runtime_srcs = "glob([\"include/**/*\", \"bin/**/*\", \"lib/**/*\"])"
   snn_exports = []
   topt_exports = []
   cmake_cl_headers = "-DOpenCL_INCLUDE_DIR=../../opencl_headers/opencl22/"
@@ -306,7 +304,6 @@ def _get_dependencies_substitutions(repository_ctx):
   use_tensoropt = _optional_get_env(repository_ctx, _TF_SYCL_USE_TENSOROPT)
 
   return {
-    "%{SYCL_RUNTIME_SRCS}%" : sycl_runtime_srcs,
     "%{SNN_EXPORTS}%" : ' '.join(snn_exports),
     "%{SNN_HOST_CMAKE_OPTIONS}%" : ' '.join(snn_host_cmake_options),
     "%{SNN_CMAKE_OPTIONS}%" : ' '.join(snn_cmake_options),

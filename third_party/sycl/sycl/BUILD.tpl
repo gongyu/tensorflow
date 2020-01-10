@@ -29,19 +29,38 @@ config_setting(
     },
 )
 
-cc_library(
-    name = "sycl",
-    hdrs = glob([
-        "**/*.h",
-        "**/*.hpp",
-    ]) + ["@opencl_headers//:OpenCL-Headers"],
-    includes = ["include"],
-    deps = ["@opencl_headers//:OpenCL-Headers"],
+filegroup(
+  name = "sycl_runtime_include_fg",
+  srcs = glob(["include/**/*.h", "include/**/*.hpp", "include/**/*.hxx"]),
 )
 
 filegroup(
-    name = "sycl_runtime_fg",
-    srcs = %{SYCL_RUNTIME_SRCS}%,
+  name = "sycl_runtime_libs_fg",
+  srcs = glob(["lib/**/*"]),
+)
+
+filegroup(
+  name = "sycl_runtime_fg",
+  srcs = glob(["bin/**/*"]) + [
+    ":sycl_runtime_include_fg",
+    ":sycl_runtime_libs_fg",
+  ],
+)
+
+cc_library(
+    name = "sycl",
+    # TODO: Enable the srcs below and find a way to not have host targets
+    # link against sycl when cross-compiling
+    #srcs = [":sycl_runtime_libs_fg"],
+    hdrs = [
+      ":sycl_runtime_include_fg",
+      "@opencl_headers//:OpenCL-Headers",
+    ],
+    includes = ["include"],
+    deps = [
+      "@opencl_headers//:OpenCL-Headers",
+    ],
+    linkstatic = 1,
 )
 
 # SYCL-DNN
@@ -50,6 +69,7 @@ genrule(
     name = "snn_genrule",
     srcs = [
       ":sycl_runtime_fg",
+      ":sycl",
       "@sycl_dnn_archive//:snn_repo",
       "@sycl_blas_archive//:sycl_blas_headers",
       "@opencl_headers//:OpenCL-Headers",
@@ -63,7 +83,7 @@ genrule(
     # The build directory depends on TARGET_CPU as the host and sycl
     # toolchains are both building SYCL-DNN in parallel.
     # An empty archive is enough for the host.
-    # $(@D) is a bazel variable substitued by the output directory
+    # $(@D) is a bazel variable substituted by the output directory
     cmd = """
           cd external/sycl_dnn_archive &&
           mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
@@ -98,6 +118,7 @@ cc_library(
 cc_library(
     name = "sycl_blas",
     deps = [
+      ":sycl",
       "@sycl_blas_archive//:sycl_blas_headers",
     ],
 )
@@ -113,6 +134,7 @@ genrule(
     name = "topt_genrule",
     srcs = [
       ":sycl_runtime_fg",
+      ":sycl",
       ":topt_backend",
       "@tensoropt_archive//:topt_repo",
     ],

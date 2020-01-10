@@ -3016,7 +3016,7 @@ cc_library(
         ":lib_internal",
         ":proto_text",
         "//third_party/eigen3",
-        "@local_config_sycl//sycl",
+        "@local_config_sycl//sycl:sycl",
         "@local_config_sycl//sycl:sycl_dnn",
         "@local_config_sycl//sycl:sycl_blas",
     ],
