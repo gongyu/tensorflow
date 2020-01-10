@@ -25,13 +25,13 @@ function cp_external() {
   local src_dir=$1
   local dest_dir=$2
 
-  pushd .
+  pushd . > /dev/null
   cd "$src_dir"
   for f in `find . ! -type d ! -name '*.py' ! -path '*local_config_cuda*' ! -path '*local_config_tensorrt*' ! -path '*local_config_tensoropt*' ! -path '*org_tensorflow*'`; do
     mkdir -p "${dest_dir}/$(dirname ${f})"
     cp "${f}" "${dest_dir}/$(dirname ${f})/"
   done
-  popd
+  popd > /dev/null
 
   mkdir -p "${dest_dir}/local_config_cuda/cuda/cuda/"
   cp "${src_dir}/local_config_cuda/cuda/cuda/cuda_config.h" "${dest_dir}/local_config_cuda/cuda/cuda/"
@@ -115,17 +115,18 @@ function prepare_src() {
         fi
       fi
     fi
-    # Copy TensorOpt libs over so they can be loaded at runtime
+    # Copy TensorOpt lib over so it can be loaded at runtime
     so_lib_dir=$(ls $RUNFILES | grep solib) || true
     if [ -n "${so_lib_dir}" ]; then
-      rt_so_dir=$(dirname `find -L ${RUNFILES}/${so_lib_dir} -type f -name "libtensoropt.so"`) || true
-      if [ -n "${rt_so_dir}" ]; then
-        echo "Found dir ${rt_so_dir}"
-        mkdir -p "${TMPDIR}/${so_lib_dir}"
-        cp -R ${rt_so_dir} "${TMPDIR}/${so_lib_dir}"
-      fi
+      for lib in "libtensoropt.so"; do
+        so_lib=$(find -L ${RUNFILES}/${so_lib_dir} -type f -name "${lib}") || true
+        if [ -n "${so_lib}" ]; then
+          mkdir -p "${TMPDIR}/${so_lib_dir}"
+          cp -R `dirname ${so_lib}` "${TMPDIR}/${so_lib_dir}"
+        fi
+      done
     fi
-    mkdir "${TMPDIR}/tensorflow/aux-bin"
+    #mkdir "${TMPDIR}/tensorflow/aux-bin"
     # Install toco as a binary in aux-bin.
 #TODO(codeplay) enable contrib/lite once it compiles with the latest Eigen
 #cp bazel-bin/tensorflow/contrib/lite/python/tflite_convert ${TMPDIR}/tensorflow/aux-bin/
