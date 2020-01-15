@@ -1367,6 +1367,14 @@ def set_env_var_if_unset(environ_cp, name, value):
 
 def set_sycl_extra_options(environ_cp):
   """Set options related to SYCL if enabled."""
+  # Cross-compiling environment variables
+  cross_toolchain = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN', '')
+  if cross_toolchain:
+    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN', cross_toolchain)
+  cross_toolchain_name = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN_NAME', '')
+  if cross_toolchain_name:
+    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN_NAME', cross_toolchain_name)
+
   # Presets are a set of options that have been tested for specific
   # configurations. They can be overwritten by the user.
   ALL_PRESETS = ['AMD_GPU', 'INTEL_GPU', 'ARM_GPU']
@@ -1381,6 +1389,7 @@ def set_sycl_extra_options(environ_cp):
     else:
       break
   set_env_var_if_unset(environ_cp, 'TF_SYCL_PLATFORM', preset)
+  is_arm_cpu = False
   if preset == 'AMD_GPU':
     set_env_var_if_unset(environ_cp, 'TF_SYCL_BITCODE_TARGET', 'spir64')
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_HALF', '0')
@@ -1399,9 +1408,15 @@ def set_sycl_extra_options(environ_cp):
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_DOUBLE', '0')
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_LOCAL_MEM', '0')
     set_env_var_if_unset(environ_cp, 'TF_SYCL_USE_SERIAL_MEMOP', '1')
-    write_to_bazelrc('build:sycl --cpu=arm')
     write_to_bazelrc('build:sycl --copt=-DARM_NON_MOBILE')
     write_to_bazelrc('build:sycl --copt=-DEIGEN_DONT_VECTORIZE_SYCL')
+    is_arm_cpu = True
+
+  if is_arm_cpu:
+    if cross_toolchain:
+      write_to_bazelrc('build:sycl --cpu=armeabi')
+    else:
+      write_to_bazelrc('build:sycl --cpu=arm')
 
   # Platforms are a compile time option that affect which kernel to choose for
   # expensive operations such as convolutions and matrix multiplication.
@@ -1443,14 +1458,6 @@ def set_sycl_extra_options(environ_cp):
   write_action_env_to_bazelrc('TF_SYCL_USE_SERIAL_MEMOP', use_serial_memop)
   if not use_serial_memop:
     write_to_bazelrc('build:sycl --cxxopt=-no-serial-memop')
-
-  # Cross-compiling environment variables
-  cross_toolchain = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN', '')
-  if cross_toolchain:
-    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN', cross_toolchain)
-  cross_toolchain_name = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN_NAME', '')
-  if cross_toolchain_name:
-    write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN_NAME', cross_toolchain_name)
 
   default_use_topt = 0
   use_tensoropt = int(environ_cp.get('TF_SYCL_USE_TENSOROPT', default_use_topt))
