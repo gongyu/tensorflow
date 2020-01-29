@@ -107,34 +107,33 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "sycl_dnn_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/803986c9165be1c058f664f3ba9f201531ede5d6.tar.gz",
-          "https://github.com/codeplaysoftware/SYCL-DNN/archive/803986c9165be1c058f664f3ba9f201531ede5d6.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/75ef98833ee5d2b3cdd0269f0c06aace10562646.tar.gz",
+          "https://github.com/codeplaysoftware/SYCL-DNN/archive/75ef98833ee5d2b3cdd0269f0c06aace10562646.tar.gz",
       ],
-      sha256 = "cc8235f903dc66227075846b563b757fb1570b3610dc52f86c8a176d738eb8aa",
-      strip_prefix = "SYCL-DNN-803986c9165be1c058f664f3ba9f201531ede5d6",
+      sha256 = "39c7cab41abc047bd76e4a9b8872f8c6cfaddcd6f26d048e1f96a297e4b1693c",
+      strip_prefix = "SYCL-DNN-75ef98833ee5d2b3cdd0269f0c06aace10562646",
       build_file = clean_dep("//third_party/sycl:sycl_dnn.BUILD"),
   )
 
   tf_http_archive(
       name = "sycl_blas_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/sycl-blas/archive/cc4cdde1970d24b5323ac80495b11739dffa86a4.tar.gz",
-          "https://github.com/codeplaysoftware/sycl-blas/archive/cc4cdde1970d24b5323ac80495b11739dffa86a4.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/sycl-blas/archive/d2b0b263d372139cb488f0799e384b67298b53cd.tar.gz",
+          "https://github.com/codeplaysoftware/sycl-blas/archive/d2b0b263d372139cb488f0799e384b67298b53cd.tar.gz",
       ],
-      sha256 = "dec0093842110584c4f2f0ced3be0bea20a5938ce9020d30cf31843ea7da1de2",
-      strip_prefix = "sycl-blas-cc4cdde1970d24b5323ac80495b11739dffa86a4",
+      sha256 = "149355ad4f831fae4f0df7b2be64b77e1118149e299d1f171d85d1c0cf7f12b7",
+      strip_prefix = "sycl-blas-d2b0b263d372139cb488f0799e384b67298b53cd",
       build_file = clean_dep("//third_party/sycl:sycl_blas.BUILD"),
   )
 
-  # TensorOpt repository is not available yet
   tf_http_archive(
       name = "tensoropt_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/computecpp-sdk/archive/c5e2f98b97a6873c57cf48d7a53297ed290964bd.tar.gz",
-          "https://github.com/codeplaysoftware/computecpp-sdk/archive/c5e2f98b97a6873c57cf48d7a53297ed290964bd.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/TensorOpt/archive/4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33.tar.gz",
+          "https://github.com/codeplaysoftware/TensorOpt/archive/4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33.tar.gz",
       ],
-      sha256 = "",
-      strip_prefix = "computecpp-sdk-c5e2f98b97a6873c57cf48d7a53297ed290964bd",
+      sha256 = "0f2fa548cfc90b3393819ececb71825304d3a18e1923da19c6fbcfff2ab223ce",
+      strip_prefix = "TensorOpt-4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33",
       build_file = clean_dep("//third_party/sycl:tensoropt.BUILD"),
   )
 
