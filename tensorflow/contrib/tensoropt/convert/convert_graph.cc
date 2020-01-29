@@ -586,10 +586,9 @@ tensorflow::Status ConvertGraphDefToTensorOpt(
     tensorflow::Status status = ConvertSubGraphToTensorOpt(&p);
 
     if (status != tensorflow::Status::OK()) {
-      // TODO(codeplay): Revert to a warning later
-      LOG(FATAL) << "subgraph conversion error for subgraph_index:" << count
-                 << " due to: \"" << status.ToString() << "\" SKIPPING......( "
-                 << subgraph_node_names.size() << " nodes)";
+      LOG(WARNING) << "subgraph conversion error for subgraph_index:" << count
+                   << " due to: \"" << status.ToString() << "\" SKIPPING......( "
+                   << subgraph_node_names.size() << " nodes)";
     }
     count++;
   }
