@@ -13,7 +13,7 @@ default_toolchain {
 }
 
 default_toolchain {
-  cpu: "armeabi"
+  cpu: "%{CPU_TARGET}%"
   toolchain_identifier: "%{CROSS_TARGET}%"
 }
 
@@ -164,7 +164,7 @@ toolchain {
   compiler_flag: "-target"
   compiler_flag: "%{CROSS_TARGET}%"
   compiler_flag: "--gcc-toolchain=%{CROSS_COMPILER_PATH}%"
-  compiler_flag: "--sysroot=%{CROSS_COMPILER_PATH}%/%{CROSS_TARGET}%/libc"
+  compiler_flag: "--sysroot=%{CROSS_SYSROOT}%"
 
   cxx_flag: "-std=c++11"
   cxx_flag: "-fsycl-ih-last"
@@ -198,13 +198,15 @@ toolchain {
   linker_flag: "-target"
   linker_flag: "%{CROSS_TARGET}%"
   linker_flag: "--gcc-toolchain=%{CROSS_COMPILER_PATH}%"
-  linker_flag: "--sysroot=%{CROSS_COMPILER_PATH}%/%{CROSS_TARGET}%/libc"
+  linker_flag: "--sysroot=%{CROSS_SYSROOT}%"
   linker_flag: "-lstdc++"
   linker_flag: "-no-canonical-prefixes"
   linker_flag: "-Wl,-z,relro,-z,now"
   linker_flag: "-Wl,--build-id=md5"
   linker_flag: "-Wl,--hash-style=gnu"
   linker_flag: "-Wl,--allow-shlib-undefined"
+
+  %{EXTRA_FLAGS}%
 
   compilation_mode_flags {
     mode: FASTBUILD

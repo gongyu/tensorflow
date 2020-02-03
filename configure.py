@@ -1374,6 +1374,9 @@ def set_sycl_extra_options(environ_cp):
   cross_toolchain_name = environ_cp.get('TF_SYCL_CROSS_TOOLCHAIN_NAME', '')
   if cross_toolchain_name:
     write_action_env_to_bazelrc('TF_SYCL_CROSS_TOOLCHAIN_NAME', cross_toolchain_name)
+  sysroot = environ_cp.get('TF_SYCL_SYSROOT', '')
+  if sysroot:
+    write_action_env_to_bazelrc('TF_SYCL_SYSROOT', sysroot)
 
   # Presets are a set of options that have been tested for specific
   # configurations. They can be overwritten by the user.
@@ -1477,6 +1480,14 @@ def set_sycl_extra_options(environ_cp):
                              'TF_SYCL_IMGDNN_DIR in order to enable TensorOpt.')
     write_to_bazelrc('build:sycl --cxxopt=-DTF_SYCL_USE_TENSOROPT=1')
     write_to_bazelrc('build:sycl --define using_tensoropt=true')
+
+  snn_build_dir = environ_cp.get('TF_SYCL_SNN_BUILD_DIR', '')
+  if snn_build_dir:
+    write_action_env_to_bazelrc('TF_SYCL_SNN_BUILD_DIR', snn_build_dir)
+
+  topt_build_dir = environ_cp.get('TF_SYCL_TOPT_BUILD_DIR', '')
+  if topt_build_dir:
+    write_action_env_to_bazelrc('TF_SYCL_TOPT_BUILD_DIR', topt_build_dir)
 
 def set_mpi_home(environ_cp):
   """Set MPI_HOME."""
@@ -1612,15 +1623,6 @@ def main():
   set_build_var(environ_cp, 'TF_NEED_VERBS', 'VERBS', 'with_verbs_support',
                 False, 'verbs')
 
-  set_action_env_var(environ_cp, 'TF_NEED_OPENCL_SYCL', 'OpenCL SYCL', False)
-  if environ_cp.get('TF_NEED_OPENCL_SYCL') == '1':
-    use_computecpp = get_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
-    set_sycl_extra_options(environ_cp)
-    if use_computecpp:
-      set_computecpp_vars(environ_cp)
-    else:
-      set_trisycl_include_dir(environ_cp)
-
   set_action_env_var(environ_cp, 'TF_NEED_CUDA', 'CUDA', False)
   if (environ_cp.get('TF_NEED_CUDA') == '1' and
       'TF_CUDA_CONFIG_REPO' not in environ_cp):
@@ -1683,11 +1685,21 @@ def main():
       create_android_ndk_rule(environ_cp)
       create_android_sdk_rule(environ_cp)
 
+  set_action_env_var(environ_cp, 'TF_NEED_OPENCL_SYCL', 'OpenCL SYCL', False)
+  if environ_cp.get('TF_NEED_OPENCL_SYCL') == '1':
+    use_computecpp = get_var(environ_cp, 'TF_NEED_COMPUTECPP', 'ComputeCPP', True)
+    set_sycl_extra_options(environ_cp)
+    if use_computecpp:
+      set_computecpp_vars(environ_cp)
+    else:
+      set_trisycl_include_dir(environ_cp)
+
   print('Preconfigured Bazel build configs. You can use any of the below by '
         'adding "--config=<>" to your build command. See tools/bazel.rc for '
         'more details.')
   config_info_line('mkl', 'Build with MKL support.')
   config_info_line('acl', 'Build with ACL support.')
+  config_info_line('sycl', 'Build with SYCL support.')
   config_info_line('monolithic', 'Config for mostly static monolithic build.')
 
 if __name__ == '__main__':

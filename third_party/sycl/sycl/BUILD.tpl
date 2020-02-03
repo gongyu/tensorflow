@@ -78,26 +78,28 @@ genrule(
       "libsycldnn_static.a",
       "include/sycldnn/export.h",
     ],
-    # Below $_ holds the last argument of the previous command,
-    # the extra $ is needed for bazel shell cmd.
-    # The build directory depends on TARGET_CPU as the host and sycl
-    # toolchains are both building SYCL-DNN in parallel.
-    # An empty archive is enough for the host.
-    # $(@D) is a bazel variable substituted by the output directory
+    # Bazel needs this genrule to be generated for the host when cross-compiling.
+    # $(@D) is a bazel variable substituted by the output directory.
     cmd = """
-          cd external/sycl_dnn_archive &&
-          mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
-          if [[ \"$(@D)\" =~ \"host\" ]]; then
-            cmake %{SNN_HOST_CMAKE_OPTIONS}% .. > cmake_log
-            ar rcs libsycldnn_static.a;
-          else
-            rm -f CMakeCache.txt &&
-            %{SNN_EXPORTS}% cmake %{SNN_HOST_CMAKE_OPTIONS}% %{SNN_CMAKE_OPTIONS}% .. > cmake_log &&
-            make sycl_dnn_static > make_log;
-          fi &&
-          cp -f libsycldnn_static.a ../../../$(@D)/ &&
-          mkdir -p ../../../$(@D)/include &&
-          cp -rf sycldnn ../../../$(@D)/include/
+      cd external/sycl_dnn_archive &&
+      if [[ "$(@D)" =~ "host" ]]; then
+        mkdir -p build_host && cd build_host &&
+        ar rcs libsycldnn_static.a &&
+        mkdir sycldnn && touch sycldnn/export.h
+      else
+        if [ -f "%{SNN_BUILD_DIR}%/libsycldnn_static.a" ] &&
+            [ -d "%{SNN_BUILD_DIR}%/sycldnn" ]; then
+          cp -rf "%{SNN_BUILD_DIR}%" build && cd build
+        else
+          mkdir -p build && cd build &&
+          rm -f CMakeCache.txt &&
+          %{SNN_EXPORTS}% cmake %{SNN_CMAKE_OPTIONS}% .. > cmake_log &&
+          make sycl_dnn_static > make_log
+        fi
+      fi
+      cp -f libsycldnn_static.a ../../../$(@D)/ &&
+      mkdir -p ../../../$(@D)/include &&
+      cp -rf sycldnn ../../../$(@D)/include/
     """,
 )
 
@@ -139,24 +141,25 @@ genrule(
       "@tensoropt_archive//:topt_repo",
     ],
     outs = ["libtensoropt.so"],
-    # Below $_ holds the last argument of the previous command,
-    # the extra $ is needed for bazel shell cmd.
-    # The build directory depends on TARGET_CPU as the host and sycl
-    # toolchains are both building the project in parallel.
-    # An empty archive is enough for the host.
-    # TensorOpt will fail to build if no backend is provided but the rule pass
-    # anyway. If no backend is provided TensorOpt is disabled and
-    # libtensoropt.so won't be used
+    # Bazel needs this genrule to be generated for the host when cross-compiling.
+    # $(@D) is a bazel variable substituted by the output directory.
+    # $@ is a bazel variable substituted by the output file.
+    # TensorOpt will fail to build if no backend is provided but the rule
+    # should pass anyway. If no backend is provided TensorOpt is disabled and
+    # libtensoropt.so won't be used.
     cmd = """
-          cd external/tensoropt_archive &&
-          mkdir -p build_`echo $(TARGET_CPU)` && cd $$_ &&
-          echo "int tensoropt_empty_so = 0;" | gcc -x c++ -shared -o libtensoropt.so - &&
-          if [[ ! \"$@\" =~ \"host\" ]]; then
-            find ! -name 'libtensoropt.so' -type f -exec rm -f {} + &&
-            %{TOPT_EXPORTS}% cmake %{TOPT_CMAKE_OPTIONS}% .. > cmake_log &&
-            make tensoropt > make_log || true;
-          fi &&
-          cp -f libtensoropt.so `dirname ../../../$@`
+      cd external/tensoropt_archive &&
+      mkdir -p build && cd build &&
+      echo "int tensoropt_empty_so = 0;" | gcc -x c++ -shared -o libtensoropt.so - &&
+      if [[ ! "$(@D)" =~ "host" ]]; then
+        if [ -f "%{TOPT_BUILD_DIR}%/libtensoropt.so" ]; then
+          cp -f "%{TOPT_BUILD_DIR}%/libtensoropt.so" .
+        else
+          %{TOPT_EXPORTS}% cmake %{TOPT_CMAKE_OPTIONS}% .. > cmake_log &&
+          make tensoropt > make_log || true
+        fi
+      fi
+      cp -f libtensoropt.so `dirname ../../../$@`
     """,
 )
 
