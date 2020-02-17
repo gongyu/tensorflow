@@ -100,6 +100,7 @@ struct TensorEvaluator<const TensorMirrorPadOp<PaddingDimensions, ArgType>,
   typedef typename PacketType<CoeffReturnType, Device>::type PacketReturnType;
   typedef StorageMemory<CoeffReturnType, Device> Storage;
   typedef typename Storage::Type EvaluatorPointerType;
+  typedef internal::TensorBlockNotImplemented TensorBlock;
   typedef internal::TensorBlockNotImplemented TensorBlockV2;
 
   enum {
