@@ -107,33 +107,33 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "sycl_dnn_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/75ef98833ee5d2b3cdd0269f0c06aace10562646.tar.gz",
-          "https://github.com/codeplaysoftware/SYCL-DNN/archive/75ef98833ee5d2b3cdd0269f0c06aace10562646.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/SYCL-DNN/archive/ee0bf09971d69953e0d2837fdef8c3a32c24769b.tar.gz",
+          "https://github.com/codeplaysoftware/SYCL-DNN/archive/ee0bf09971d69953e0d2837fdef8c3a32c24769b.tar.gz",
       ],
-      sha256 = "39c7cab41abc047bd76e4a9b8872f8c6cfaddcd6f26d048e1f96a297e4b1693c",
-      strip_prefix = "SYCL-DNN-75ef98833ee5d2b3cdd0269f0c06aace10562646",
+      sha256 = "5ae42f3fefb6f2582f5f5a90ea814a93a5aa9cd29bd706ebfa8d590df61c6544",
+      strip_prefix = "SYCL-DNN-ee0bf09971d69953e0d2837fdef8c3a32c24769b",
       build_file = clean_dep("//third_party/sycl:sycl_dnn.BUILD"),
   )
 
   tf_http_archive(
       name = "sycl_blas_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/sycl-blas/archive/d2b0b263d372139cb488f0799e384b67298b53cd.tar.gz",
-          "https://github.com/codeplaysoftware/sycl-blas/archive/d2b0b263d372139cb488f0799e384b67298b53cd.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/sycl-blas/archive/770bae04bd11cf5e3c047bee6a3c21ac54db2a42.tar.gz",
+          "https://github.com/codeplaysoftware/sycl-blas/archive/770bae04bd11cf5e3c047bee6a3c21ac54db2a42.tar.gz",
       ],
-      sha256 = "149355ad4f831fae4f0df7b2be64b77e1118149e299d1f171d85d1c0cf7f12b7",
-      strip_prefix = "sycl-blas-d2b0b263d372139cb488f0799e384b67298b53cd",
+      sha256 = "ac04906c396e16da508254ca95377b3c93db12b6a53c9acc0c6e6fd4742e7600",
+      strip_prefix = "sycl-blas-770bae04bd11cf5e3c047bee6a3c21ac54db2a42",
       build_file = clean_dep("//third_party/sycl:sycl_blas.BUILD"),
   )
 
   tf_http_archive(
       name = "tensoropt_archive",
       urls = [
-          "https://mirror.bazel.build/github.com/codeplaysoftware/TensorOpt/archive/4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33.tar.gz",
-          "https://github.com/codeplaysoftware/TensorOpt/archive/4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33.tar.gz",
+          "https://mirror.bazel.build/github.com/codeplaysoftware/TensorOpt/archive/62562f0dc8c15c1ff9ffeee408556d019e0e345c.tar.gz",
+          "https://github.com/codeplaysoftware/TensorOpt/archive/62562f0dc8c15c1ff9ffeee408556d019e0e345c.tar.gz",
       ],
-      sha256 = "0f2fa548cfc90b3393819ececb71825304d3a18e1923da19c6fbcfff2ab223ce",
-      strip_prefix = "TensorOpt-4b2b05d650ca8b3447b26f5c9b88de5cd15b0b33",
+      sha256 = "3190c5f7a4bc3b49cd6c01112b92f60c322e2217d9e9be68beaa15e7fefcc632",
+      strip_prefix = "TensorOpt-62562f0dc8c15c1ff9ffeee408556d019e0e345c",
       build_file = clean_dep("//third_party/sycl:tensoropt.BUILD"),
   )
 
@@ -151,11 +151,11 @@ def tf_workspace(path_prefix="", tf_repo_name=""):
   tf_http_archive(
       name = "eigen_archive",
       urls = [
-          "https://mirror.bazel.build/gitlab.com/libeigen/eigen/-/archive/956131d0e648b468a51ac6e481b31151b132468e/eigen.tar.gz",
-          "https://gitlab.com/libeigen/eigen/-/archive/956131d0e648b468a51ac6e481b31151b132468e/eigen.tar.gz",
+          "https://mirror.bazel.build/gitlab.com/libeigen/eigen/-/archive/deb93ed1bf359ac99923e3a2b90a2920b1101290/eigen.tar.gz",
+          "https://gitlab.com/libeigen/eigen/-/archive/deb93ed1bf359ac99923e3a2b90a2920b1101290/eigen.tar.gz",
       ],
-      sha256 = "249fbe43296fadf0da2337532c3c9e0ccc681a93a8f3a019511d5ee1fe67670b",
-      strip_prefix = "eigen-956131d0e648b468a51ac6e481b31151b132468e",
+      sha256 = "62d1581a740caa74f1bf9db8552abebcd772bf12be035e9422bd59bfb0a2ba8e",
+      strip_prefix = "eigen-deb93ed1bf359ac99923e3a2b90a2920b1101290",
       build_file = clean_dep("//third_party:eigen.BUILD"),
   )
 
